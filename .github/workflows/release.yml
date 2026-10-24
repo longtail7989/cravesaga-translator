@@ -1,0 +1,73 @@
+name: Release extension and Windows helper
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag, exactly v followed by manifest/core version (for example v0.3.5)
+        required: true
+        type: string
+
+# No PAT or repository secrets. Only the publishing job may write releases.
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  test-build:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+    with:
+      release-tag: ${{ inputs.tag || github.ref_name }}
+
+  publish:
+    needs: test-build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-bundles
+          path: dist
+      - name: Verify tag, version, and asset checksums
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          $version = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -cne "v$version") { throw 'Tag/version mismatch' }
+          $lines = @(Get-Content dist/SHA256SUMS)
+          if ($lines.Count -ne 2) { throw 'Expected exactly two checksums' }
+          foreach ($line in $lines) {
+            if ($line -cnotmatch '^([a-f0-9]{64})  ([A-Za-z0-9._-]+\.zip)$') { throw 'Invalid SHA256SUMS entry' }
+            $expected = $Matches[1]
+            $file = Join-Path 'dist' $Matches[2]
+            if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw "Checksum mismatch: $file" }
+          }
+      - name: Publish or update GitHub Release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          $assets = @(Get-ChildItem dist/*.zip | ForEach-Object FullName) + @((Join-Path $PWD 'dist/SHA256SUMS'))
+          gh release view $env:RELEASE_TAG --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG @assets --clobber
+          } else {
+            gh release create $env:RELEASE_TAG @assets --verify-tag --title "크레이브사가 번역기 $env:RELEASE_TAG" --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

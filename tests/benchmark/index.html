@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Isolated translation cache benchmark</title><link rel="stylesheet" href="./benchmark.css"><script type="module" src="./runner.mjs"></script></head>
+<body><main>
+<h1>Translation cache benchmark</h1>
+<p>Sequential <strong>200, 500, 700 decimal MB</strong> synthetic datasets. Each uses a separate owned temporary database, deleted before the next dataset. No providers, credentials, network, or production cache access.</p>
+<p>Logical bytes mean the sum of UTF-8 JSON bytes of normalized cache entries (source, translation, ID, context, language, timestamps). Storage estimate deltas are approximate origin-wide browser usage, not exact physical database size. Native quota/disk failures are not performance failures.</p>
+<div class="controls"><button id="start">Start all three datasets</button><button id="stop" disabled>Stop safely</button></div>
+<p id="status" role="status">Ready. May take several minutes. Keep this document open until cleanup finishes.</p>
+<progress id="progress" max="100" value="0"></progress><p id="detail">Idle</p>
+<p>Stop finishes the current bounded batch/operation, then destroys the temporary database. No animation frames or timer-per-batch scheduling. Closing the document abruptly cannot guarantee cleanup; use Stop and wait.</p>
+<h2>Results</h2><div id="metrics"></div>
+<details open><summary>Machine-readable results</summary><pre id="results">{}</pre></details>
+</main></body></html>

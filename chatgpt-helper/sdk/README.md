@@ -1,0 +1,27 @@
+# Official SDK source and build
+
+Pinned upstream: https://github.com/openai/sign-in-with-chatgpt-devkit/commit/0a36fefeb913055c8c7a1a29b63d82b96b2e841a . Local workspace `@siwc/local` version 0.1.0. Not npm-published. Upstream TypeScript source is unchanged.
+
+From a normal supported Node >=22.13 runtime, run `node chatgpt-helper/sdk/prepare.mjs` to verify cached official dependency tarballs against the upstream package-lock SHA-512 and erase TypeScript types with Node's built-in `module.stripTypeScriptTypes(mode:'strip')`. This preserves source semantics without installing a compiler or running lifecycle scripts. `--acquire` fetches the commit-pinned GitHub archive and exact locked npm tarballs again. The build emits PINNED-SOURCE.json (source SHA-256, commit, package versions and integrity) and local/dist, and copies upstream LICENSE, THIRD_PARTY_NOTICES.md and dependency inventory unchanged. No OAuth, user credentials, OS keyring or inference are accessed during preparation.
+
+Runtime dependency closure: jose 6.2.12, openai 7.21.0, proper-lockfile 4.1.2, graceful-fs 4.2.11, retry 0.12.0, signal-exit 3.0.7. Their own license files must stay with each package. This is local helper SDK preparation, not a Codex/Claude install.
+
+## Install payload allowlist
+
+Copy `service.mjs`, the upstream `packages/local/package.json`, `packages/local/dist/**`, and only the above six upstream `node_modules/<name>/**` runtime package directories, retaining every package license. Preserve upstream relative layout because service's SDK import is pinned to it. Include this README and PINNED-SOURCE.json. Do not install npm-cache, downloads, upstream.tar.gz, upstream examples, dev packages or tests. The complete source archive/build recipe may remain a separate source distribution.
+
+## Public contract
+
+`await createService({storageDirectory,protect,unprotect,openBrowser?})`. Storage must be a host-owned ACL-restricted absolute directory; DPAPI CurrentUser callbacks take/return Uint8Array promises. They are mandatory, with no plaintext fallback. SDK profile files contain only a provider id and encrypted ciphertext; stable host UUID is separate nonsecret metadata. SDK storage serializes rotating refresh with a proper-lockfile interprocess lock. Service also owns a lifetime `.translator-service.lock` to prevent another process changing selected identity during requests; after a crash it fails closed. Only a host that independently proves the owner dead may clear a stale lease.
+
+Methods: status(), startLogin({profileId?,newProfile?}), cancelLogin(), selectProfile(id), logout(id?), models(), translate({model,system,user},signal), close(). `system` is ignored. `user` is bounded untrusted JSON `{target,items:[{id,text,context?}]}`. Translation output is a JSON string `{translations:[{id,text}]}` validated for exact ids/fields and placeholders. `startLogin` returns pending state without awaiting the user flow. `close` is required on host shutdown. STATUS is protected local metadata only; MODELS can refresh OAuth but never performs inference. Models are visible official catalog entries, not an entitlement guarantee. Errors expose only allowlisted codes, never SDK/server messages, tokens or authorization URLs.
+
+The SDK performs JOSE RS256 signature verification and issuer/audience/expiry/nonce/subject checks, state and PKCE validation, issued dynamic client-id persistence and direct-scope checks. `sendHostId:true` persists and sends the host UUID before OAuth. SDK intentionally omits ID-token authorization hints (per upstream security comment) but retains the ID token protected at rest. Switching/revoking cancels this service's inference; output epoch checks reject late results. Logout attempts official refresh-token revocation and retains account/client mapping even if remote revocation cannot be confirmed (`revocation_failed`).
+
+The unmodified SDK uses only official public `/v1/models` and `/v1/responses`, with store:false, stream:true, no tools, retries=0 and 180s inference deadline. Service transport adds 2MiB response-body, 128KiB SSE-line, 256KiB translation-output limits and fixed-origin protection. Success requires SDK `response.completed`, not merely emitted text. The service exposes no URL/proxy/function/file endpoint.
+
+Synthetic tests: `node --test chatgpt-helper/service.test.mjs`. Test DI is trusted code only and must NEVER be accepted from extension/native messages. Identity validation is upstream code, not replaced by a custom OAuth implementation. No real sign-in or inference was attempted during implementation.
+
+## Verification state
+
+Build completed successfully with Node 26.5.0. Pinned source archive SHA-256: `dbe3d701810ae17a85b0d1b78f8c93975dacbcedb27d7df35c0af78b8e78d5ad`. All six runtime archives passed upstream lockfile SHA-512 verification. Service tests: 9/9 passed. Official upstream authorization tests: 4/4 passed with generated synthetic RSA identities, mocked fetch/browser spawn, and local loopback callbacks only. No real authentication, inference, OS DPAPI calls or app installation were performed. Restricted-shell workaround used ProcessStartInfo with explicit allowed working directory, known runtime Node executable, --preserve-symlinks and --preserve-symlinks-main; tests imported file URLs directly because this sandbox's node --test path preflight could not resolve absolute test files. No live-account/DPAPI tests should be run without user authorization.

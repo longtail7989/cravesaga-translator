@@ -1,0 +1,183 @@
+{
+  "core": {
+    "bugs": {
+      "url": "https://github.com/Koromix/koffi/issues"
+    },
+    "dist": {
+      "shasum": "86ed3f673f5f8524d65f519460af5394eef8663a",
+      "tarball": "https://registry.npmjs.org/koffi/-/koffi-3.3.4.tgz",
+      "fileCount": 87,
+      "integrity": "sha512-31Vr+LM+w1dEsNcOJtJWvYyUTjVc/SWOxNDZJxfhsBC6qZ5YVn98n5x1oBbDq5skxCbWD4SByJpNmq63fvg9Aw==",
+      "signatures": [
+        {
+          "sig": "MEQCIDkJFbuSEr/dwYGHNcP2mfWFou33WSbCFeBFnwgIPykaAiAty9bBri6cqREsecgPJJC7KnIxyTi8EIQQxJrLUmZaZg==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEYCIQCflGCd5FFhbAMZ4qgSZoHl5PfgpeWcKFFNv8cNr9YITAIhAN7hHvptQ28lnBcUckkWo7o8xksLUS+fZsRmiwOjQyG7",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 1746038
+    },
+    "main": "./index.cjs",
+    "name": "koffi",
+    "type": "module",
+    "_from": "file:koffi-3.3.4.tgz",
+    "cnoke": {
+      "api": "../../vendor/node-api-headers",
+      "napi": 8,
+      "node": 16,
+      "output": "build/koffi/{{ toolchain }}"
+    },
+    "types": "./index.d.ts",
+    "author": {
+      "url": "https://koromix.dev/",
+      "name": "Niels Martignène",
+      "email": "niels.martignene@protonmail.com"
+    },
+    "module": "./index.js",
+    "exports": {
+      ".": {
+        "types": "./index.d.ts",
+        "import": "./index.js",
+        "require": "./index.cjs"
+      },
+      "./indirect": {
+        "types": "./index.d.ts",
+        "import": "./indirect.js",
+        "require": "./indirect.cjs"
+      }
+    },
+    "funding": "https://liberapay.com/Koromix",
+    "license": "MIT",
+    "scripts": {
+      "install": "node ./cnoke.cjs -P . -D src/koffi --prebuild --release"
+    },
+    "_npmUser": {
+      "name": "koromix",
+      "email": "niels.martignene@protonmail.com"
+    },
+    "homepage": "https://koffi.dev/",
+    "keywords": [
+      "foreign",
+      "function",
+      "interface",
+      "ffi",
+      "binding",
+      "c",
+      "napi"
+    ],
+    "_resolved": "/home/niels/Code/shadow/bin/Koffi/packages/koffi-3.3.4.tgz",
+    "_integrity": "sha512-31Vr+LM+w1dEsNcOJtJWvYyUTjVc/SWOxNDZJxfhsBC6qZ5YVn98n5x1oBbDq5skxCbWD4SByJpNmq63fvg9Aw==",
+    "repository": {
+      "url": "git+https://github.com/Koromix/koffi.git",
+      "type": "git"
+    },
+    "_npmVersion": "11.20.0",
+    "description": "Fast and easy-to-use dynamic C FFI (foreign function interface) for Node.js",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "koromix",
+        "email": "niels.martignene@protonmail.com"
+      }
+    ],
+    "_nodeVersion": "26.12.1",
+    "_hasShrinkwrap": false,
+    "optionalDependencies": {
+      "@koromix/koffi-linux-arm": "3.3.4",
+      "@koromix/koffi-linux-x64": "3.3.4",
+      "@koromix/koffi-win32-x64": "3.3.4",
+      "@koromix/koffi-darwin-x64": "3.3.4",
+      "@koromix/koffi-linux-ia32": "3.3.4",
+      "@koromix/koffi-win32-ia32": "3.3.4",
+      "@koromix/koffi-android-x64": "3.3.4",
+      "@koromix/koffi-freebsd-x64": "3.3.4",
+      "@koromix/koffi-linux-arm64": "3.3.4",
+      "@koromix/koffi-linux-ppc64": "3.3.4",
+      "@koromix/koffi-openbsd-x64": "3.3.4",
+      "@koromix/koffi-win32-arm64": "3.3.4",
+      "@koromix/koffi-darwin-arm64": "3.3.4",
+      "@koromix/koffi-freebsd-ia32": "3.3.4",
+      "@koromix/koffi-openbsd-ia32": "3.3.4",
+      "@koromix/koffi-android-arm64": "3.3.4",
+      "@koromix/koffi-freebsd-arm64": "3.3.4",
+      "@koromix/koffi-linux-loong64": "3.3.4",
+      "@koromix/koffi-linux-riscv64": "3.3.4",
+      "@koromix/koffi-openbsd-arm64": "3.3.4"
+    },
+    "_npmOperationalInternal": {
+      "tmp": "tmp/koffi_3.3.4_1792857123367_0.10989708190154301",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "koffi@3.3.4",
+    "version": "3.3.4"
+  },
+  "native": {
+    "os": [
+      "win32"
+    ],
+    "cpu": [
+      "x64"
+    ],
+    "bugs": {
+      "url": "https://github.com/Koromix/koffi/issues"
+    },
+    "dist": {
+      "shasum": "7ae1f2184e8a20385c9e69717c6f4a5fbce70ea8",
+      "tarball": "https://registry.npmjs.org/@koromix/koffi-win32-x64/-/koffi-win32-x64-3.3.4.tgz",
+      "fileCount": 5,
+      "integrity": "sha512-/SpehfYrO9DtkoB0ZOgGyco4GH4zwhEyFqgCm0x8lbzXnrKiwnHXWmPpfuXhFYohFvoSO5jlLQz/hc1fJ5G0AQ==",
+      "signatures": [
+        {
+          "sig": "MEQCIGOm+j2W64T1jKDKzMHuu+JaOsxSCXxzIeJlMJkYcppZAiAelstV75WjpJ+3WdWL1kSXqg0vIaP5937XNCFMGmnzSA==",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        },
+        {
+          "sig": "MEYCIQCDSVTe/i6tWZyYN1778E6rlQ0ho8hX8SqruIrBugdimwIhAKuR6QY6iDJ60WNjrd/sRaSuNCUvoNwLFyAyJnsvNPU7",
+          "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+        }
+      ],
+      "unpackedSize": 1054303
+    },
+    "main": "./index.js",
+    "name": "@koromix/koffi-win32-x64",
+    "_from": "file:koromix-koffi-win32-x64-3.3.4.tgz",
+    "author": {
+      "url": "https://koromix.dev/",
+      "name": "Niels Martignène",
+      "email": "niels.martignene@protonmail.com"
+    },
+    "funding": "https://liberapay.com/Koromix",
+    "license": "MIT",
+    "_npmUser": {
+      "name": "koromix",
+      "email": "niels.martignene@protonmail.com"
+    },
+    "homepage": "https://koffi.dev/",
+    "_resolved": "/home/niels/Code/shadow/bin/Koffi/packages/koromix-koffi-win32-x64-3.3.4.tgz",
+    "_integrity": "sha512-/SpehfYrO9DtkoB0ZOgGyco4GH4zwhEyFqgCm0x8lbzXnrKiwnHXWmPpfuXhFYohFvoSO5jlLQz/hc1fJ5G0AQ==",
+    "repository": {
+      "url": "git+https://github.com/Koromix/koffi.git",
+      "type": "git"
+    },
+    "_npmVersion": "11.20.0",
+    "description": "Fast and easy-to-use dynamic C FFI (foreign function interface) for Node.js (@koromix/koffi-win32-x64)",
+    "directories": {},
+    "maintainers": [
+      {
+        "name": "koromix",
+        "email": "niels.martignene@protonmail.com"
+      }
+    ],
+    "_nodeVersion": "26.12.1",
+    "_hasShrinkwrap": false,
+    "_npmOperationalInternal": {
+      "tmp": "tmp/koffi-win32-x64_3.3.4_1792857071206_0.4789640891972995",
+      "host": "s3://npm-registry-packages-npm-production"
+    },
+    "_id": "@koromix/koffi-win32-x64@3.3.4",
+    "version": "3.3.4"
+  }
+}

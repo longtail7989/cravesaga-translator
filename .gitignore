@@ -1,0 +1,28 @@
+# Local state, credentials and generated releases
+node_modules/
+dist/
+.tmp/
+.env
+.env.*
+*.log
+*.har
+*.ndjson
+*.sqlite
+*.sqlite-*
+*.db
+*.dpapi
+**/state/
+**/profiles/
+**/.crave-install.json
+**/registry-before.json
+**/config.local.json
+# Rebuilt from pinned archives, never commit expanded dependencies
+chatgpt-helper/sdk/openai-sign-in-with-chatgpt-devkit-0a36fef/
+chatgpt-helper/windows/vendor/koffi/
+# Machine-specific validation notes and redundant raw crop
+VALIDATION.md
+docs/VALIDATION-*.md
+icons/source-crop.png
+
+# Historical local performance/captured hash reports
+benchmarks/

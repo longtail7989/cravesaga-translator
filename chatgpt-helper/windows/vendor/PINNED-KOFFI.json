@@ -1,0 +1,492 @@
+{
+  "packages": [
+    {
+      "unpackedBytes": 1746038,
+      "tarballBytes": 302759,
+      "version": "3.3.4",
+      "name": "koffi",
+      "sha512": "sha512-31Vr+LM+w1dEsNcOJtJWvYyUTjVc/SWOxNDZJxfhsBC6qZ5YVn98n5x1oBbDq5skxCbWD4SByJpNmq63fvg9Aw==",
+      "url": "https://registry.npmjs.org/koffi/-/koffi-3.3.4.tgz"
+    },
+    {
+      "unpackedBytes": 1054303,
+      "tarballBytes": 401224,
+      "version": "3.3.4",
+      "name": "@koromix/koffi-win32-x64",
+      "sha512": "sha512-/SpehfYrO9DtkoB0ZOgGyco4GH4zwhEyFqgCm0x8lbzXnrKiwnHXWmPpfuXhFYohFvoSO5jlLQz/hc1fJ5G0AQ==",
+      "url": "https://registry.npmjs.org/@koromix/koffi-win32-x64/-/koffi-win32-x64-3.3.4.tgz"
+    }
+  ],
+  "arch": "x64",
+  "installScriptsExecuted": false,
+  "verifiedAt": "2026-10-24T16:42:38.6679795Z",
+  "platform": "win32",
+  "files": [
+    {
+      "bytes": 34154,
+      "sha256": "56b948cb416b1b5ca19e378e7775f3449ca9f435cd8db8b57c411d3752b04eb5",
+      "path": "koffi\\CHANGELOG.md"
+    },
+    {
+      "bytes": 31081,
+      "sha256": "d5e4c3b53c1166265f3b7a386a0aec446bb99c41bf58c6c05643d1dcade12ffd",
+      "path": "koffi\\cnoke.cjs"
+    },
+    {
+      "bytes": 50,
+      "sha256": "a200e15ec168d00cb3155794808a98243051c61dd7f6989c23c57ee220c918b9",
+      "path": "koffi\\index.cjs"
+    },
+    {
+      "bytes": 12838,
+      "sha256": "b4f749b16500797d1f0e9ed0f04e08e1b162cfbaf48e3efbacee8f27182b4ad1",
+      "path": "koffi\\index.d.ts"
+    },
+    {
+      "bytes": 85,
+      "sha256": "34508972d2e18b79fd4a289943568a68bbaf18badd2e82a25c8deb1af27f6225",
+      "path": "koffi\\index.js"
+    },
+    {
+      "bytes": 53,
+      "sha256": "f36c7fd3caa9c43da3db45e1ee272892087b4001b6f575fffb76dd80574829b1",
+      "path": "koffi\\indirect.cjs"
+    },
+    {
+      "bytes": 91,
+      "sha256": "5c5045c5b5ec2083535efdfdbd95f5212545ce29a4b7f33a683504a35e5b6a02",
+      "path": "koffi\\indirect.js"
+    },
+    {
+      "bytes": 1117,
+      "sha256": "22bcbbbacd739b026a8dc484f62a31484ce4c4e31f3408b60b29b4e41d62b290",
+      "path": "koffi\\LICENSE.txt"
+    },
+    {
+      "bytes": 2304,
+      "sha256": "c0060beaf0e14ea08ba221fb19878fdc9da930de1d115b370a9d4d62bb3cdbc0",
+      "path": "koffi\\package.json"
+    },
+    {
+      "bytes": 2972,
+      "sha256": "4b629384f63225cad0265c5c148a3a88f466cd6b337ffeae6242fec5bfb17206",
+      "path": "koffi\\README.md"
+    },
+    {
+      "bytes": 5101,
+      "sha256": "22c01524839803c41120bb8c733580c8c8ed50fc8a91cd97135ee686f653bc49",
+      "path": "koffi\\doc\\benchmarks.md"
+    },
+    {
+      "bytes": 7909,
+      "sha256": "f1e3f14a1d84a5b6d6d7d6d3015a9859043f4d3773b932d361bc49f08a240284",
+      "path": "koffi\\doc\\callbacks.md"
+    },
+    {
+      "bytes": 16117,
+      "sha256": "83d107330187f08088a7e2b1aa98f06585dcf2f0719aae66a47af6fb95edc40d",
+      "path": "koffi\\doc\\composites.md"
+    },
+    {
+      "bytes": 5744,
+      "sha256": "72cecf31345e1d4e46d564bc4aa5020c5a445968cc2a818b337bf3a1019a4cbe",
+      "path": "koffi\\doc\\contribute.md"
+    },
+    {
+      "bytes": 3044,
+      "sha256": "8a69e582805fff52da9a2149c635895ade22a494502de1770a412673431b71a9",
+      "path": "koffi\\doc\\index.md"
+    },
+    {
+      "bytes": 7522,
+      "sha256": "fb917db1fa983b6e495b498f0dba168b72ac794b6938a585c6473a90c5736f68",
+      "path": "koffi\\doc\\load.md"
+    },
+    {
+      "bytes": 8909,
+      "sha256": "3826d5c78a612cd11d0319d7c4e0afebde3c5c67a7848fcb5016fc9c4ccd3333",
+      "path": "koffi\\doc\\migration.md"
+    },
+    {
+      "bytes": 3851,
+      "sha256": "25698c141b2324ec4ce133f59901749c69f3880dafb511dae13fabd7c21da673",
+      "path": "koffi\\doc\\misc.md"
+    },
+    {
+      "bytes": 9366,
+      "sha256": "78a692be2e23954ad024345806b2d4937a45113be6c48cfc2fdd53dc49c32580",
+      "path": "koffi\\doc\\output.md"
+    },
+    {
+      "bytes": 15051,
+      "sha256": "628890dec2cbe8304e006effaaead83e36d5e6b3695f3b7bf7e8add1d26f513c",
+      "path": "koffi\\doc\\pointers.md"
+    },
+    {
+      "bytes": 7561,
+      "sha256": "3b4cab3721ecd6cad4ccc0ba251f9edae24e3b03bb94ac22234b5c8718a7f346",
+      "path": "koffi\\doc\\primitives.md"
+    },
+    {
+      "bytes": 3008,
+      "sha256": "95c57729bd5b4477e39a8950fd4f1e6c8121cf5fba58907d16f2c8d5bdf92b8d",
+      "path": "koffi\\doc\\start.md"
+    },
+    {
+      "bytes": 2828,
+      "sha256": "d8a1acfcc5f416038f05b6f53a93445e80cba70755592d6ceaf5b9df9b3c5440",
+      "path": "koffi\\doc\\types.md"
+    },
+    {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "path": "koffi\\doc\\unions.md"
+    },
+    {
+      "bytes": 6324,
+      "sha256": "f712dc80674c1711b76edc64b1a55c06e5003e17b542afe071bc20cdfed161ba",
+      "path": "koffi\\doc\\values.md"
+    },
+    {
+      "bytes": 10084,
+      "sha256": "a25a035c16f80c3a49ea259d867f0003d3a3eee93c5ffb7df2bae3e2fd2974f6",
+      "path": "koffi\\src\\koffi\\CMakeLists.txt"
+    },
+    {
+      "bytes": 10999,
+      "sha256": "72a1d3026409f8c896a59f51b085c21d7eacbf273dca4ccd21da6f47e70b3425",
+      "path": "koffi\\src\\koffi\\index.cjs"
+    },
+    {
+      "bytes": 9563,
+      "sha256": "b9407610a6e4a7c802b9774298debeb5a70a7ccd49bcd15f250377d928223eff",
+      "path": "koffi\\src\\koffi\\index.js"
+    },
+    {
+      "bytes": 10933,
+      "sha256": "6e981e4fa3995b321a14eb4ccc8a8ae2d1a1c6940f8057073fb70a717b84b3cc",
+      "path": "koffi\\src\\koffi\\indirect.cjs"
+    },
+    {
+      "bytes": 9507,
+      "sha256": "7aa058c6e018bed11f9e51cf53be1fdfba54fd2c9fd0359f7ba190db8b34abc4",
+      "path": "koffi\\src\\koffi\\indirect.js"
+    },
+    {
+      "bytes": 1150,
+      "sha256": "89024017b88a9f2b763f79b941a4f2db3b4428edfcacdc0b23866b2da633ad0c",
+      "path": "koffi\\vendor\\node-addon-api\\LICENSE.md"
+    },
+    {
+      "bytes": 6323,
+      "sha256": "b66ed1e565e735bbfabcc2f72d466ab7c5414d3ef8851d1af440b81be7f2375c",
+      "path": "koffi\\vendor\\node-addon-api\\napi-inl.deprecated.h"
+    },
+    {
+      "bytes": 243550,
+      "sha256": "e62de83e6125e45719dff26546e8cf7ec819ac1ed890db28431db433c88fcd50",
+      "path": "koffi\\vendor\\node-addon-api\\napi-inl.h"
+    },
+    {
+      "bytes": 125611,
+      "sha256": "5e0eff20229ba021fa7c5ff6f62dfecc36f8c29f2da365b25cde3d6489d8b924",
+      "path": "koffi\\vendor\\node-addon-api\\napi.h"
+    },
+    {
+      "bytes": 4994,
+      "sha256": "9c9fcf38e120933aac37fe2cbdcb85abb59ecb1a674abe944c9b627dff8539a6",
+      "path": "koffi\\vendor\\node-addon-api\\README.md"
+    },
+    {
+      "bytes": 1064,
+      "sha256": "a553508f516031c91f3af1148d44970cb81bbae6c4f091be6835d39cc252238c",
+      "path": "koffi\\vendor\\node-api-headers\\LICENSE"
+    },
+    {
+      "bytes": 2741,
+      "sha256": "63a4e81d19f02b164d51c4721ff3e88c81d410640de7e1d3520a2c406f0a7d83",
+      "path": "koffi\\vendor\\node-api-headers\\README.md"
+    },
+    {
+      "bytes": 336737,
+      "sha256": "a44e0ec4b9047c5f6abc9d0e69481f0e726d73e3c7a7fbf760e2e143db5db82d",
+      "path": "koffi\\lib\\native\\base\\base.cc"
+    },
+    {
+      "bytes": 188090,
+      "sha256": "946a6ca21e8473604eabc58e46b4ea88e98754be919913038cbd16789f141359",
+      "path": "koffi\\lib\\native\\base\\base.hh"
+    },
+    {
+      "bytes": 36653,
+      "sha256": "a337b5e53a6c72534fcf093c58d7fbf12f7b1075f068ea83a09c91e34373b5a4",
+      "path": "koffi\\lib\\native\\base\\unicode.inc"
+    },
+    {
+      "bytes": 52,
+      "sha256": "f9991ec70a0f775487ffadc2461d69edd1555e3d9bf80de0bbdd2eec7d245c49",
+      "path": "koffi\\node_modules\\@koromix\\koffi-win32-x64\\index.js"
+    },
+    {
+      "bytes": 644,
+      "sha256": "1be050186663778724acd9e184a4b5f5b702c8b8aa412545ffe7cf67973c692b",
+      "path": "koffi\\node_modules\\@koromix\\koffi-win32-x64\\package.json"
+    },
+    {
+      "bytes": 271,
+      "sha256": "4fc87635ba2ce995d9f91401e96c68dd0600ca3db25dae419a9abc4e8e11fcd0",
+      "path": "koffi\\node_modules\\@koromix\\koffi-win32-x64\\README.md"
+    },
+    {
+      "bytes": 72979,
+      "sha256": "36291f3dbbff70f79f9a3632e7c49899b16be925a501ab5020cf14eadc33fd82",
+      "path": "koffi\\src\\koffi\\src\\call.cc"
+    },
+    {
+      "bytes": 6017,
+      "sha256": "4492aa7fb78c7d812fe8ad550bb21ab96e579d4de3c5f223444a73cad0963246",
+      "path": "koffi\\src\\koffi\\src\\call.hh"
+    },
+    {
+      "bytes": 8776,
+      "sha256": "f2fea4a329fbf7aa7e5a6c52daacc480d70d782344e37fd7e62019f6b914201a",
+      "path": "koffi\\src\\koffi\\src\\errno.inc"
+    },
+    {
+      "bytes": 111529,
+      "sha256": "355213d5986332f09956e2893b95ace19d896aff868c27294148e2cd86b9b9fe",
+      "path": "koffi\\src\\koffi\\src\\ffi.cc"
+    },
+    {
+      "bytes": 9763,
+      "sha256": "22ffe28d1739c96d7c92c36a2696aa0b617a5f03aef6eca1df5361b111f1b130",
+      "path": "koffi\\src\\koffi\\src\\ffi.hh"
+    },
+    {
+      "bytes": 55318,
+      "sha256": "809a3b7e401e0446fe205257721d35060b7427720240eb04aae5f7fdb6c0b073",
+      "path": "koffi\\src\\koffi\\src\\interp.cc"
+    },
+    {
+      "bytes": 3290,
+      "sha256": "2e1002df27774b422b114ec120ef33d64993740b1c7288cbfc78f8073d6c5310",
+      "path": "koffi\\src\\koffi\\src\\interp.hh"
+    },
+    {
+      "bytes": 6256,
+      "sha256": "a10d056248137353dbf407788907702a1b1238f5a09709216252ebb04207535d",
+      "path": "koffi\\src\\koffi\\src\\parser.cc"
+    },
+    {
+      "bytes": 1253,
+      "sha256": "cfd9e374884cdc0f60716de41bbe110d361bc10d0a8539942e37d34c86b525ae",
+      "path": "koffi\\src\\koffi\\src\\parser.hh"
+    },
+    {
+      "bytes": 857,
+      "sha256": "34f524982a6e921a63c6766619b337b6d15f0a5cdefbf252481dda4b4369afda",
+      "path": "koffi\\src\\koffi\\src\\primitives.inc"
+    },
+    {
+      "bytes": 3591,
+      "sha256": "522a9d98e271b565de4013910b8c81bb061a34d3460e43fd9a92daab8fbadddc",
+      "path": "koffi\\src\\koffi\\src\\static.cjs"
+    },
+    {
+      "bytes": 3674,
+      "sha256": "a2a6ea215e4d5f26d039b48eee1e7c8ca037935c4fcba8d0ec2b6e680fa7a976",
+      "path": "koffi\\src\\koffi\\src\\static.js"
+    },
+    {
+      "bytes": 2033,
+      "sha256": "82895e2a78b911b297e7497d9d6033ab87a0afe64f4904615dacfa318d83adfa",
+      "path": "koffi\\src\\koffi\\src\\trampolines.cjs"
+    },
+    {
+      "bytes": 26729,
+      "sha256": "e53fa2144b27390c57dadbcce8a1436930e0b3852dcde6bcf10f9597ed1bb670",
+      "path": "koffi\\src\\koffi\\src\\type.cc"
+    },
+    {
+      "bytes": 2499,
+      "sha256": "1959e022aa9ce03a8db2e02ccc16d11fab6590cd8e066b6dfb4fd28b4759520c",
+      "path": "koffi\\src\\koffi\\src\\type.hh"
+    },
+    {
+      "bytes": 32822,
+      "sha256": "327d535c6963cc9a68bc683b395cc96d73ca3b00a7bdbbe5ee6f715b21dd9419",
+      "path": "koffi\\src\\koffi\\src\\util.cc"
+    },
+    {
+      "bytes": 12808,
+      "sha256": "2337c191d18c95f6bfe98db33b6ac8d6b04b4d0c41bb58abcf3bb0bf0695abad",
+      "path": "koffi\\src\\koffi\\src\\util.hh"
+    },
+    {
+      "bytes": 6731,
+      "sha256": "bca85ba816537329337d4f0e4a62b22e333332130d5a3023477bbf5790a3c1ba",
+      "path": "koffi\\src\\koffi\\src\\uv.cc"
+    },
+    {
+      "bytes": 134,
+      "sha256": "4a40dc700dc66214fc1c464db8c4b78b82845e3b7b4e6103418ac519346ca4d2",
+      "path": "koffi\\src\\koffi\\src\\uv.def"
+    },
+    {
+      "bytes": 2652,
+      "sha256": "7c440bf33890aece980fc66882408ae8f864d391a9e3c77596f000ae84afcef5",
+      "path": "koffi\\src\\koffi\\src\\uv.hh"
+    },
+    {
+      "bytes": 5890,
+      "sha256": "86e4aedf1c66b28225be9a0a6b709961555dc8e6c85809d9a1f20df46c405644",
+      "path": "koffi\\src\\koffi\\src\\win32.cc"
+    },
+    {
+      "bytes": 3932,
+      "sha256": "46b0b57a2771e1f2647d49711ca249029dc93e92a17007302a78dd58fe3bd4f2",
+      "path": "koffi\\src\\koffi\\src\\win32.hh"
+    },
+    {
+      "bytes": 2734,
+      "sha256": "77653a554fbb27f6c5666f4ba05f87d26f0de72bc3d0439961ac030030c2be66",
+      "path": "koffi\\vendor\\node-api-headers\\def\\js_native_api.def"
+    },
+    {
+      "bytes": 3550,
+      "sha256": "e0d5e3da0520a42e26b563f6321291081bd15bdd20821d46818e5f47900f77d6",
+      "path": "koffi\\vendor\\node-api-headers\\def\\node_api.def"
+    },
+    {
+      "bytes": 31081,
+      "sha256": "0953395662ea63697cd7a77a9320d94aa2829f9c9569abf3a74272b7a2923ce8",
+      "path": "koffi\\vendor\\node-api-headers\\include\\js_native_api.h"
+    },
+    {
+      "bytes": 6744,
+      "sha256": "21eebde05d2ee59d315ac27d4aa82434ca88508a0b2cf5819802a00ca523831d",
+      "path": "koffi\\vendor\\node-api-headers\\include\\js_native_api_types.h"
+    },
+    {
+      "bytes": 10370,
+      "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+      "path": "koffi\\vendor\\node-api-headers\\include\\node_api.h"
+    },
+    {
+      "bytes": 1930,
+      "sha256": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00",
+      "path": "koffi\\vendor\\node-api-headers\\include\\node_api_types.h"
+    },
+    {
+      "bytes": 1688,
+      "sha256": "581078774d824496b8250bf436f47ef80e1694700c83955d9e9475fcfaebd980",
+      "path": "koffi\\node_modules\\@koromix\\koffi-win32-x64\\win32_x64\\koffi.lib"
+    },
+    {
+      "bytes": 1051648,
+      "sha256": "a77b6bb6f60cdd360a41cc4e9f8a0e2a4c5b8e6dd83f43e756af285c59a7c4c2",
+      "path": "koffi\\node_modules\\@koromix\\koffi-win32-x64\\win32_x64\\koffi.node"
+    },
+    {
+      "bytes": 11352,
+      "sha256": "ecaf681bc9555706c127a828572c5df1ac5afcd81a9c3bd8fe89df47ec87904a",
+      "path": "koffi\\src\\koffi\\src\\abi\\arm32.cc"
+    },
+    {
+      "bytes": 4319,
+      "sha256": "7d47bd0119a1433bfb328d54a5c03d96e4b08917cfc469db304e8a5c918ec3c5",
+      "path": "koffi\\src\\koffi\\src\\abi\\arm32_asm.S"
+    },
+    {
+      "bytes": 13646,
+      "sha256": "0b5977e6e3b542a3e2e67495fa37762c5b801b44f3ac68af5519666ff3eb5cd0",
+      "path": "koffi\\src\\koffi\\src\\abi\\arm64.cc"
+    },
+    {
+      "bytes": 4489,
+      "sha256": "89c2d933d801b41cd5adde2bb0762d98a2bcd96d2e2dcc18f76650a3e0f8d5db",
+      "path": "koffi\\src\\koffi\\src\\abi\\arm64_asm.asm"
+    },
+    {
+      "bytes": 5455,
+      "sha256": "bd2ccebb85c62abbf49a351f4b740a660eb2c8b2b1054fa7f9aafd9c0db92e61",
+      "path": "koffi\\src\\koffi\\src\\abi\\arm64_asm.S"
+    },
+    {
+      "bytes": 273,
+      "sha256": "dc53190f98c24d8f909358f23a20ce861d58124a232e87e8e2aeb3566ae02088",
+      "path": "koffi\\src\\koffi\\src\\abi\\loong64.cc"
+    },
+    {
+      "bytes": 4644,
+      "sha256": "0276681d52b70fee199edd73964e7684260027605563ce51c8eb04a8c6400025",
+      "path": "koffi\\src\\koffi\\src\\abi\\loong64_asm.S"
+    },
+    {
+      "bytes": 8364,
+      "sha256": "e3490a81075dd9584a573ab19337129ddac09b8402132099c34972c2a55c8ad2",
+      "path": "koffi\\src\\koffi\\src\\abi\\ppc64.cc"
+    },
+    {
+      "bytes": 5648,
+      "sha256": "b2d8d01143d980a4ab9ff513d22924e9d41553b1903067f78de0b9bb9bf31570",
+      "path": "koffi\\src\\koffi\\src\\abi\\ppc64_asm.S"
+    },
+    {
+      "bytes": 12058,
+      "sha256": "8478c20d90d8abdc72e074f5e324324dbe0c012899b53f306b04f69f2745927a",
+      "path": "koffi\\src\\koffi\\src\\abi\\riscv64.cc"
+    },
+    {
+      "bytes": 4369,
+      "sha256": "9294984fca21eff02784afe02b59f31d7dcde9c3600b68db1674b7b65174c3d2",
+      "path": "koffi\\src\\koffi\\src\\abi\\riscv64_asm.S"
+    },
+    {
+      "bytes": 13827,
+      "sha256": "5e9622e786ef89e800dde18dffcb886a76e1610a2ec5a266b3ca81707e284197",
+      "path": "koffi\\src\\koffi\\src\\abi\\x64sysv.cc"
+    },
+    {
+      "bytes": 5486,
+      "sha256": "4daa7ee2445cdd047d582af8c9079447c85b3d58db9806fb734eb6a2440ea411",
+      "path": "koffi\\src\\koffi\\src\\abi\\x64sysv_asm.S"
+    },
+    {
+      "bytes": 4873,
+      "sha256": "c49884b12188f63457ffde2c325c1a33f5ca324e732d031fd2faaa1601de3446",
+      "path": "koffi\\src\\koffi\\src\\abi\\x64win.cc"
+    },
+    {
+      "bytes": 4708,
+      "sha256": "2e3e8014820b352cb0eb775c03996edcd8438917b0ca43e975cda3d4f5bfc467",
+      "path": "koffi\\src\\koffi\\src\\abi\\x64win_asm.asm"
+    },
+    {
+      "bytes": 3883,
+      "sha256": "cf309cb28046d9656e683deed3a4e9f5e44266f129593dd154d0c88f822854d3",
+      "path": "koffi\\src\\koffi\\src\\abi\\x64win_asm.S"
+    },
+    {
+      "bytes": 9090,
+      "sha256": "d00024375e2625b5d4820c2dfb41914f687b105809aeaf0660efc260e02293c8",
+      "path": "koffi\\src\\koffi\\src\\abi\\x86.cc"
+    },
+    {
+      "bytes": 3875,
+      "sha256": "e24a7ae3e2a95bef4bf6e695653bb6a6931c782f6045d3acfe5a1e6e18c8b8c5",
+      "path": "koffi\\src\\koffi\\src\\abi\\x86_asm.asm"
+    },
+    {
+      "bytes": 4658,
+      "sha256": "d10bf04332429f032a59108c11c14087061c972231f39b7efccb35a16689f397",
+      "path": "koffi\\src\\koffi\\src\\abi\\x86_asm.S"
+    },
+    {
+      "bytes": 1113,
+      "sha256": "54abb741a2ba1a7fa89e98d2d3199575e548c8708885eeadab0f5bb83ad22e0e",
+      "path": "LICENSE-KOFFI.txt"
+    }
+  ],
+  "licenseSource": "https://raw.githubusercontent.com/Koromix/koffi/master/LICENSE.txt"
+}

@@ -1,0 +1,22 @@
+'use strict';
+const assert = require('node:assert/strict');
+const { protect, unprotect, protectSync, unprotectSync } = require('./dpapi.cjs');
+(async () => {
+ const s = Buffer.from(JSON.stringify({synthetic:true,token:'not-a-real-token',unicode:'테스트'}));
+ const a = protectSync(s), b = await protect(s);
+ assert(a.toString().startsWith('dpapi-current-user:v1:'));
+ assert(!a.includes('not-a-real-token'));
+ assert.deepEqual(unprotectSync(a), s);
+ assert.deepEqual(await unprotect(b), s);
+ assert.deepEqual(unprotectSync(b), s);
+ assert.deepEqual(await unprotect(a), s);
+ assert.throws(() => unprotectSync(s));
+ assert.throws(() => unprotectSync(Buffer.from('dpapi-current-user:v1:AAAA')));
+ await assert.rejects(() => unprotect(Buffer.from('dpapi-current-user:v1:AAAA')));
+ assert.throws(() => protectSync(Buffer.alloc(0)));
+ assert.throws(() => protectSync(Buffer.alloc(1024*1024+1)));
+ const raw = Buffer.from(a.toString().slice('dpapi-current-user:v1:'.length), 'base64');
+ raw[Math.floor(raw.length/2)] ^= 1;
+ assert.throws(() => unprotectSync(Buffer.from('dpapi-current-user:v1:' + raw.toString('base64'))));
+ console.log('PASS: synthetic DPAPI bytes sync/async, cross-mode, plaintext rejection, malformed, empty, oversize and tamper tests.');
+})().catch(() => { console.error('FAIL: synthetic DPAPI test (no secret output).'); process.exitCode=1; });
