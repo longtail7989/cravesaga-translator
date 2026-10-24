@@ -8,3 +8,6 @@
 *.tgz binary
 *.gz binary
 *.png binary
+
+# Integrity-pinned native provenance inputs must retain exact bytes.
+chatgpt-helper/windows/vendor/** -text
