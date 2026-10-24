@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Offline only. No login, live providers, browser profile, or installed extension.
 import {spawnSync} from 'node:child_process';
-import {readFileSync, readdirSync, mkdtempSync, rmSync, mkdirSync} from 'node:fs';
+import {readFileSync, readdirSync, mkdtempSync, rmSync, mkdirSync, realpathSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
@@ -20,7 +20,9 @@ const actual = readdirSync(path.join(root,'tests')).filter(f => f.endsWith('.cjs
 if (JSON.stringify(expected) !== JSON.stringify(actual)) throw Error('CJS suite inventory changed; update scripts/test.mjs explicitly');
 const worker = readFileSync(path.join(root,'tests/worker.cjs'),'utf8');
 for (const file of embedded) if (!worker.includes('tests/' + file)) throw Error('Missing embedded suite: ' + file);
-const scratch = mkdtempSync(path.join(os.tmpdir(),'crave-ai-offline-'));
+// Windows runners may expose TEMP through an 8.3 alias such as RUNNER~1.
+// Use the native canonical path so strict helper storage checks see one identity.
+const scratch = realpathSync.native(mkdtempSync(path.join(os.tmpdir(),'crave-ai-offline-')));
 let failed = 0;
 try {
  const home = path.join(scratch,'home'); mkdirSync(home);
