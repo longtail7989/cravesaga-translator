@@ -9,6 +9,8 @@
 - 대용량 캐시 입출력·병합과 배포용 번역 파일 수집
 
 ## 설치
+
+**[자세한 설치 설명서: 확장 설치부터 ChatGPT helper 연결까지](https://github.com/longtail7989/cravesaga-translator/blob/main/INSTALL.MD)**
 1. [최신 릴리스](https://github.com/longtail7989/cravesaga-translator/releases/latest)에서 `*-extension.zip`을 받아 고정된 폴더에 압축을 풉니다.
 2. `chrome://extensions` → 개발자 모드 → **압축해제된 확장 프로그램 로드**에서 해당 폴더를 선택합니다.
 3. 확장 아이콘에서 제공자·모델·인증 정보와 전송 동의를 설정합니다. API 사용량·비용은 선택한 제공자 정책을 따릅니다.
