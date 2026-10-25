@@ -21,7 +21,7 @@ if (JSON.stringify(expected) !== JSON.stringify(actual)) throw Error('CJS suite 
 const worker = readFileSync(path.join(root,'tests/worker.cjs'),'utf8');
 for (const file of embedded) if (!worker.includes('tests/' + file)) throw Error('Missing embedded suite: ' + file);
 // Windows runners may expose TEMP through an 8.3 alias such as RUNNER~1.
-// Use the native canonical path so strict helper storage checks see one identity.
+// Keep one canonical scratch identity for isolated Windows test storage.
 const scratch = realpathSync.native(mkdtempSync(path.join(os.tmpdir(),'crave-ai-offline-')));
 let failed = 0;
 try {
@@ -31,13 +31,10 @@ try {
   TMP:scratch, TEMP:scratch, TMPDIR:scratch};
  // Drop accidental provider credentials and inherited Node preloads.
  for (const key of Object.keys(env)) if (/(?:TOKEN|SECRET|PASSWORD|API_KEY|APIKEY|AUTHORIZATION)/i.test(key) || key === 'NODE_OPTIONS') delete env[key];
- // The protocol suite spawns its own Node byte-stream host without execArgv.
- // Propagate only these controlled path flags, never caller-provided preloads.
+ // Propagate only these controlled path flags to child fixtures, never caller-provided preloads.
  env.NODE_OPTIONS = '--preserve-symlinks --preserve-symlinks-main';
- const entries = suites.map(f => ['tests/' + f, false]).concat([
-  ['chatgpt-helper/protocol.test.cjs',true], ['chatgpt-helper/service.test.mjs',true]
- ]);
- for (const [file, nativeTest] of entries) {
+ const entries = suites.map(f => 'tests/' + f);
+ for (const file of entries) {
   console.log('\n=== ' + file + ' ===');
   // Direct file execution preserves __dirname; node:test runs without --test discovery.
   // This also works in constrained environments where --test cannot stat ancestors.
@@ -46,5 +43,5 @@ try {
   if (result.error || result.status !== 0) { failed++; console.error('FAILED ' + file, result.error?.message || result.signal || result.status); }
  }
 } finally { rmSync(scratch,{recursive:true,force:true}); }
-console.log('\n' + (failed ? 'FAILED: ' + failed + ' entrypoint(s)' : 'PASS: 22 offline CJS suites (20 entrypoints + 2 embedded worker suites), plus helper protocol and service tests.'));
+console.log('\n' + (failed ? 'FAILED: ' + failed + ' entrypoint(s)' : 'PASS: 22 offline extension CJS suites (20 entrypoints + 2 embedded worker suites).'));
 if (failed) process.exitCode = 1;

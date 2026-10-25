@@ -16,9 +16,8 @@ dist/
 **/.crave-install.json
 **/registry-before.json
 **/config.local.json
-# Rebuilt from pinned archives, never commit expanded dependencies
-chatgpt-helper/sdk/openai-sign-in-with-chatgpt-devkit-0a36fef/
-chatgpt-helper/windows/vendor/koffi/
+# Legacy local copy only; helper source is maintained in its separate repository
+chatgpt-helper/
 # Machine-specific validation notes and redundant raw crop
 VALIDATION.md
 docs/VALIDATION-*.md

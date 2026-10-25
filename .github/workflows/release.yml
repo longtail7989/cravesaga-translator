@@ -1,4 +1,4 @@
-name: Release extension and Windows helper
+name: Release extension
 
 on:
   push:
@@ -39,35 +39,58 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
-          name: release-bundles
+          name: extension-release-bundle
           path: dist
-      - name: Verify tag, version, and asset checksums
+      - name: Verify tag, version, and extension checksum
         shell: pwsh
         env:
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           $version = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
           if ($env:RELEASE_TAG -cne "v$version") { throw 'Tag/version mismatch' }
+          $zips = @(Get-ChildItem dist/*.zip)
+          $expectedName = "crave-ai-translator-$version-extension.zip"
+          if ($zips.Count -ne 1 -or $zips[0].Name -cne $expectedName) { throw 'Expected exactly one versioned extension ZIP' }
           $lines = @(Get-Content dist/SHA256SUMS)
-          if ($lines.Count -ne 2) { throw 'Expected exactly two checksums' }
-          foreach ($line in $lines) {
-            if ($line -cnotmatch '^([a-f0-9]{64})  ([A-Za-z0-9._-]+\.zip)$') { throw 'Invalid SHA256SUMS entry' }
-            $expected = $Matches[1]
-            $file = Join-Path 'dist' $Matches[2]
-            if ((Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw "Checksum mismatch: $file" }
-          }
-      - name: Publish or update GitHub Release assets
+          if ($lines.Count -ne 1) { throw 'Expected exactly one checksum' }
+          if ($lines[0] -cnotmatch '^([a-f0-9]{64})  ([A-Za-z0-9._-]+-extension\.zip)$') { throw 'Invalid SHA256SUMS entry' }
+          $expected = $Matches[1]
+          if ($Matches[2] -cne $expectedName) { throw 'Checksum filename mismatch' }
+          if ((Get-FileHash $zips[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) { throw 'Extension checksum mismatch' }
+      - name: Publish missing release assets without replacing existing files
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          $assets = @(Get-ChildItem dist/*.zip | ForEach-Object FullName) + @((Join-Path $PWD 'dist/SHA256SUMS'))
-          gh release view $env:RELEASE_TAG --json tagName *> $null
+          $assets = @(Get-ChildItem dist/*-extension.zip | ForEach-Object FullName) + @((Join-Path $PWD 'dist/SHA256SUMS'))
+          $releaseJson = gh release view $env:RELEASE_TAG --json assets 2>$null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload $env:RELEASE_TAG @assets --clobber
+            $existingNames = @((($releaseJson -join "`n") | ConvertFrom-Json).assets | ForEach-Object name)
+            $downloadDir = Join-Path $env:RUNNER_TEMP ('existing-release-' + [guid]::NewGuid().ToString('N'))
+            New-Item -ItemType Directory -Path $downloadDir | Out-Null
+            try {
+              $missing = @()
+              foreach ($asset in $assets) {
+                $name = Split-Path $asset -Leaf
+                if ($existingNames -ccontains $name) {
+                  gh release download $env:RELEASE_TAG --pattern $name --dir $downloadDir
+                  if ($LASTEXITCODE -ne 0) { throw "Unable to verify existing asset: $name" }
+                  $remoteHash = (Get-FileHash (Join-Path $downloadDir $name) -Algorithm SHA256).Hash
+                  if ($remoteHash -cne (Get-FileHash $asset -Algorithm SHA256).Hash) { throw "Existing asset differs; refusing replacement: $name" }
+                } else {
+                  $missing += $asset
+                }
+              }
+              if ($missing.Count -gt 0) {
+                gh release upload $env:RELEASE_TAG @missing
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              }
+            } finally {
+              Remove-Item -LiteralPath $downloadDir -Recurse -Force
+            }
           } else {
             gh release create $env:RELEASE_TAG @assets --verify-tag --title "크레이브사가 번역기 $env:RELEASE_TAG" --generate-notes
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

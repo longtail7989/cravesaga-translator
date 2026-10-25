@@ -1,4 +1,4 @@
-name: Offline tests and Windows packages
+name: Offline extension tests and package
 
 on:
   push:
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run 22 offline CJS suites and helper protocol/service tests
+      - name: Run 22 offline extension CJS suites (20 standalone and 2 embedded)
         run: node scripts/test.mjs
       - name: Build allowlisted extension ZIP and verify reproducibility
         shell: pwsh
@@ -43,27 +43,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $second = (Get-FileHash dist/*-extension.zip -Algorithm SHA256).Hash
           if ($first -cne $second) { throw 'Extension ZIP is not reproducible' }
-      - name: Build separate Windows native helper ZIP
-        shell: pwsh
-        env:
-          RELEASE_TAG: ${{ inputs.release-tag }}
-        run: |
-          $buildArgs = @('scripts/build-helper.mjs', '--out', 'dist', '--offline')
-          if ($env:RELEASE_TAG) { $buildArgs += @('--tag', $env:RELEASE_TAG) }
-          node @buildArgs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Create SHA256SUMS for exactly two ZIP assets
+      - name: Create SHA256SUMS for exactly one extension ZIP
         shell: pwsh
         run: |
-          $zips = @(Get-ChildItem dist/*.zip | Sort-Object Name)
-          if ($zips.Count -ne 2) { throw 'Expected one extension ZIP and one helper ZIP' }
-          $lines = $zips | ForEach-Object { '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name }
-          [System.IO.File]::WriteAllText((Join-Path $PWD 'dist/SHA256SUMS'), (($lines -join "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
+          $zips = @(Get-ChildItem dist/*.zip)
+          if ($zips.Count -ne 1 -or $zips[0].Name -cnotmatch '-extension\.zip$') { throw 'Expected exactly one extension ZIP' }
+          $line = '{0}  {1}' -f (Get-FileHash $zips[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $zips[0].Name
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'dist/SHA256SUMS'), ($line + "`n"), [System.Text.UTF8Encoding]::new($false))
       - uses: actions/upload-artifact@v4
         with:
-          name: release-bundles
+          name: extension-release-bundle
           path: |
-            dist/*.zip
+            dist/*-extension.zip
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
