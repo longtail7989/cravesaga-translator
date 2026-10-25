@@ -1,42 +1,79 @@
 # 크레이브사가 번역기
 
-크레이브 사가 게임 텍스트를 선택한 AI로 번역하는 비공식 Chrome 확장입니다.
+크레이브 사가의 추출 가능한 게임 텍스트를 사용자가 선택한 AI로 번역하는 비공식 Chrome 확장입니다.
 
-## 주요 기능
-- OpenAI · Gemini · Anthropic API 및 OpenAI 호환 서버
-- ChatGPT 공식 로그인 연결(선택 설치한 Windows 로컬 helper 필요)
-- 정확한 원문+대상 언어 캐시, 캐시 On/Off, 현재 화면 번역 직접 수정
-- 대용량 캐시 입출력·병합과 배포용 번역 파일 수집
+**v0.3.5는 이 GitHub 저장소의 첫 공개 릴리스입니다.** 내부 개발 과정에서 완성한 번역·캐시·직접 수정·번역 파일 수집 기능을 함께 제공합니다. 이전 공개 버전의 변경분이 아니라 처음 사용하는 분을 위한 전체 기능 안내입니다.
 
-## 설치
+- [첫 공개 릴리스 다운로드](https://github.com/longtail7989/cravesaga-translator/releases/tag/v0.3.5)
+- **[상세 설치 설명서: 확장 + ChatGPT helper](https://github.com/longtail7989/cravesaga-translator/blob/main/INSTALL.MD)**
+- [v0.3.5 전체 구성·기능 기록](https://github.com/longtail7989/cravesaga-translator/blob/main/CHANGELOG.md)
+- [별도 ChatGPT helper 저장소](https://github.com/longtail7989/cravesage-translator-gpt-helper)
 
-**[자세한 설치 설명서: 확장 설치부터 ChatGPT helper 연결까지](https://github.com/longtail7989/cravesaga-translator/blob/main/INSTALL.MD)**
-1. [최신 릴리스](https://github.com/longtail7989/cravesaga-translator/releases/latest)에서 `*-extension.zip`을 받아 고정된 폴더에 압축을 풉니다.
-2. `chrome://extensions` → 개발자 모드 → **압축해제된 확장 프로그램 로드**에서 해당 폴더를 선택합니다.
-3. 확장 아이콘에서 제공자·모델·인증 정보와 전송 동의를 설정합니다. API 사용량·비용은 선택한 제공자 정책을 따릅니다.
+## 처음 설치하는 분께
 
-업데이트는 같은 폴더에 파일을 교체하고 확장을 갱신하세요. 확장을 삭제하면 브라우저에 저장된 데이터가 지워질 수 있습니다. 실행 중인 게임은 진행 상황을 확인한 뒤 직접 새로고침하세요.
+1. Releases에서 이름 끝이 **`-extension.zip`인 배포 파일**과 `SHA256SUMS`를 받습니다. 일반 설치에는 Source code ZIP을 사용하지 않습니다.
+2. 체크섬을 확인한 뒤 고정 폴더에 압축을 풀고, Chrome의 `chrome://extensions` → 개발자 모드 → **압축해제된 확장 프로그램 로드**로 `manifest.json`이 있는 폴더를 선택합니다.
+3. 툴바에서 제공자·모델·인증 정보·전송 동의와 자동 번역 상태를 정하고 **변경 사항 저장**을 누릅니다.
+4. 게임 탭에서 연결 상태를 확인합니다. 이미 실행 중인 게임은 진행 상황을 확인한 뒤 직접 새로고침합니다.
 
-## ChatGPT helper
-helper는 별도 저장소 [cravesage-translator-gpt-helper](https://github.com/longtail7989/cravesage-translator-gpt-helper)에서 독립적으로 관리·배포합니다. [helper 릴리스](https://github.com/longtail7989/cravesage-translator-gpt-helper/releases/latest)에서 받으세요. API 연결만 사용하면 설치할 필요가 없습니다. 이 저장소의 테스트·빌드·릴리스에는 helper 소스나 ZIP이 필요하지 않습니다.
+Chrome 116 이상이 필요합니다. API 방식에는 helper가 필요 없고, ChatGPT 로그인 방식만 별도 helper를 사용합니다. 설치·업데이트·제거와 오류별 절차는 [INSTALL.MD](https://github.com/longtail7989/cravesaga-translator/blob/main/INSTALL.MD)에 설명되어 있습니다.
 
-helper는 Windows x64·Node.js 22.13 이상용 실험적 기능입니다. 현재 신뢰 대상은 개발용 확장 ID `mfoolamgailfmmpddefkpnbfiecleefi` 하나로 제한됩니다. 다른 경로·기기에서 압축해제한 확장은 ID가 달라질 수 있으므로 **일반적인 모든 압축해제 설치에서 ChatGPT 연결을 보장하지 않습니다.** 보안 검사를 우회하거나 허용 출처를 와일드카드로 바꾸지 마세요. [helper 설치·제약 안내](https://github.com/longtail7989/cravesage-translator-gpt-helper#readme)를 먼저 확인하세요. 저장소 분리 때문에 기존에 정상 연결한 사용자가 재설치·로그인할 필요는 없습니다.
+## v0.3.5에 포함된 전체 기능
 
-helper에 포함된 OpenAI Sign-in with ChatGPT SDK는 **비상업용 라이선스**이며 별도 서비스 이용 조건이 적용됩니다. 로그인 자체가 모델 접근 권한·사용량 잔여를 보장하지 않습니다. helper 저장소에서 원본 라이선스와 제3자 고지를 확인하세요.
+### AI 연결과 게임 텍스트 번역
 
-## 개발·배포
-Node.js 22.13 이상을 사용합니다. 배포 자동화는 Windows·PowerShell 7에서 실행합니다.
+- OpenAI API, Google Gemini API, Claude·Anthropic API, OpenAI 호환 서버를 선택할 수 있습니다.
+- 조건을 충족한 Windows 환경에서는 별도 helper를 통한 ChatGPT 공식 로그인 연결을 사용할 수 있습니다.
+- 모델 ID 직접 입력·목록 조회, 전송 동의, 자동 번역 On/Off를 제공합니다. 로그인만으로 제공자를 바꾸거나 번역을 실행하지 않습니다.
+- 추출 가능한 게임 화면 문구를 번역합니다. 이미지 속 글자까지 모두 인식하는 OCR 기능은 아닙니다.
+- 중복 요청 억제, 묶음 처리, 시간 제한·일시 오류 재시도, 실패 문구 수동 재시도와 진행 상태를 제공합니다.
+- 글꼴·대상 언어·영문 처리·전송량·일일 요청/문자 한도 등 사용자가 조절하는 설정을 제공합니다.
+
+### 번역 캐시와 게임 리모콘
+
+- **정확히 같은 원문 + 대상 언어**를 기준으로 저장 번역을 재사용합니다. 화면·문맥·제공자·모델별로 캐시를 따로 나누지 않습니다.
+- 빠른 메모리 캐시와 브라우저의 영구 저장 캐시를 함께 사용합니다. 저장 한도는 브라우저 할당량·디스크 여유 공간의 제한을 받습니다.
+- **캐시 On**은 저장 번역을 재사용합니다. **캐시 Off**는 새 번역을 시도하고 성공한 결과로 갱신합니다.
+- **캐시 전용**은 AI 요청 없이 저장된 번역만 적용하며 캐시 Off보다 우선합니다. 없는 문구는 원문으로 남습니다.
+
+> 캐시 Off의 새 번역은 추가 비용·사용량을 발생시키며 기존 수동 수정본도 바꿀 수 있습니다. 캐시나 재시도 설정이 무료·무제한 사용을 의미하지는 않습니다.
+
+### 번역 직접 수정과 삭제
+
+- 게임 리모콘에서 현재 화면의 원문·번역을 확인하고 AI 요청 없이 수정할 수 있습니다.
+- 확장 팝업에서 저장된 번역을 찾아 개별 수정·삭제할 수 있습니다.
+- 숫자·태그·변수·줄바꿈 검증, 오래된 편집의 충돌 감지, 늦게 도착한 자동 결과의 수동 수정 덮어쓰기 방지를 제공합니다.
+- 삭제·전체 교체 등 파괴적인 작업은 확인 절차를 거칩니다.
+
+### 대용량 캐시 파일과 배포용 번역 수집
+
+- 대용량 NDJSON 순차 입출력과 기존 JSON 형식 호환을 제공합니다. JSON 가져오기는 32 MiB 이하이며 큰 파일은 NDJSON을 사용합니다.
+- 병합 시 **로컬 번역 유지(기본)** 또는 **파일 번역 사용**을 선택합니다. 파일 우선은 수동 수정도 덮어쓸 수 있어 확인이 필요합니다.
+- **배포 Start / Finish**로 적용된 번역을 개인 캐시와 별도로 기록하고 선택한 NDJSON 파일에 저장합니다.
+- 부분 수집 오류를 알리고 불완전한 저장은 별도 확인을 요구합니다. 저장 실패 시 수집분을 보존해 재시도할 수 있습니다.
+- 기록 자체가 별도 AI 요청을 추가하지는 않지만 일반 게임 번역은 계속 요청될 수 있습니다.
+
+## ChatGPT helper와 현재 지원 범위
+
+helper는 [cravesage-translator-gpt-helper](https://github.com/longtail7989/cravesage-translator-gpt-helper)에서 독립 관리·배포합니다. 이 저장소에는 helper 서버·설치 코드·ZIP을 포함하지 않습니다.
+
+**현재 helper는 확장 ID `mfoolamgailfmmpddefkpnbfiecleefi` 하나만 허용합니다.** 다른 PC·경로에 압축해제한 확장의 ID는 다를 수 있으므로, 모든 새 설치의 ChatGPT 연결을 보장하지 않습니다. ID가 다르면 API 방식으로 사용하거나 정식 지원 배포를 기다리세요. 출처 검사를 우회하거나 와일드카드로 바꾸지 않습니다.
+
+helper는 Windows x64용 실험적·미서명 배포이며 별도 Node.js가 필요합니다. 포함된 OpenAI SDK는 **비상업용 라이선스**이고 계정·모델·서비스 이용 조건이 별도로 적용됩니다. ChatGPT 구독과 API 결제는 별개이며, 로그인 자체는 특정 모델 이용 권한·사용량 잔여를 보장하지 않습니다. CLI 브리지 방식은 지원하지 않습니다.
+
+## 데이터와 비용
+
+게임 텍스트는 동의한 제공자에 전송됩니다. 자동 번역·재시도·실제 연결 테스트는 비용 또는 구독 사용량을 소모할 수 있습니다. 키·쿠키·로그인 토큰·개인 캐시·게임 계정 데이터는 저장소나 릴리스에 포함하지 않습니다. 번역 내보내기 파일에는 게임 원문·번역문·사용자 이름이 들어갈 수 있으니 공유 전 확인하세요.
+
+이미 정상 작동하는 확장·helper는 문서 정리나 저장소 분리 때문에 재설치·재로그인할 필요가 없습니다. 업데이트할 때는 먼저 캐시를 백업하고 고정 설치 폴더를 유지하세요. 게임·캐릭터 이미지의 권리는 원저작권자에게 있으며 공식 제품이나 제휴 도구가 아닙니다.
+
+## 개발·검증·배포
+
+Node.js 22.13 이상을 사용하며 GitHub CI는 Windows·Node 22 계열에서 실행됩니다.
 
 ```sh
 node scripts/test.mjs
 node scripts/build-extension.mjs --out dist
 ```
 
-오프라인 회귀 검증은 확장 전용 22개 CJS suite(독립 실행 20개 + worker에 포함된 2개)를 실행하며, ChatGPT native-client 경계는 mock으로 검증합니다. 실제 로그인·제공자 요청이나 별도 helper 테스트는 실행하지 않습니다.
-
-push·PR은 GitHub Actions 검증을 실행합니다. 향후 릴리스에서는 `manifest.json`과 `core.mjs`의 버전을 맞춘 뒤 `v0.3.5` 같은 태그를 push하면 검증 → 확장 ZIP 하나 생성 → 체크섬 → GitHub Release 게시를 진행합니다. 수동 실행도 지원합니다. 자세한 운영 순서는 [배포 안내](docs/RELEASING.md)를 참고하세요. **Chrome 웹 스토어 자동 게시 기능은 아닙니다.**
-
-helper 저장소 분리는 확장 버전 변경이나 새 릴리스를 요구하지 않습니다. 기존 v0.3.5 확장 ZIP과 설치된 확장·인증 상태는 변경하지 않습니다.
-
-## 데이터·권리
-키·쿠키·로그인 토큰·개인 캐시·게임 계정 데이터는 저장소와 릴리스에 포함하지 않습니다. 번역 배포 파일에는 게임 대사와 사용자 이름이 포함될 수 있으니 공유 전에 확인하세요. 브라우저 할당량과 디스크 제한이 적용됩니다. 게임·캐릭터 이미지의 권리는 원저작권자에게 있으며 공식 제품이나 공식 제휴 도구가 아닙니다.
+확장 전용 회귀 검증 22개 묶음(독립 실행 20개 + worker 내 2개)과 native-client mock을 사용합니다. CI는 실제 로그인·설치·제공자 번역을 실행하지 않습니다. 버전 태그는 검증 → 확장 ZIP·체크섬 → GitHub Release 게시를 수행합니다. Chrome 웹 스토어 자동 게시나 자동 업데이트 기능은 아닙니다. [배포 운영 안내](docs/RELEASING.md)와 [캐시 형식](CACHE.md)을 참고하세요.
