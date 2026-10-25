@@ -6,6 +6,7 @@
 
 - [첫 공개 릴리스 다운로드](https://github.com/longtail7989/cravesaga-translator/releases/tag/v0.3.5)
 - **[상세 설치 설명서: 확장 + ChatGPT helper](https://github.com/longtail7989/cravesaga-translator/blob/main/INSTALL.MD)**
+- **[자세한 사용 설명서: 확장 옵션 + 게임 리모콘](https://github.com/longtail7989/cravesaga-translator/blob/main/USAGE.MD)**
 - [v0.3.5 전체 구성·기능 기록](https://github.com/longtail7989/cravesaga-translator/blob/main/CHANGELOG.md)
 - [별도 ChatGPT helper 저장소](https://github.com/longtail7989/cravesage-translator-gpt-helper)
 
