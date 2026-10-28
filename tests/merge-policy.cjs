@@ -36,6 +36,15 @@ for(const route of ['legacy','stream']){
   check(`${route} ${policy} exact source plus target identity and atomic count`,()=>{assert.equal(r.ok,true);assert.equal(r.imported,policy==='keep-local'?2:3);assert.equal(r.cacheCount,3);assert.equal(count(),3);assert.equal(cache.size,3);assert(cache.has(sibling.id));assert(cache.has(exact.id));});
   const replacement=await make('전체 교체',false);const rep=await perform(route,[replacement],policy,'replace');check(`${route} ${policy} replace semantics unchanged`,()=>{assert.equal(rep.ok,true);assert.equal(rep.imported,1);assert.equal(rep.cacheCount,1);assert.equal(count(),1);assert.equal(cache.get(replacement.id).text,replacement.text);});
  }
+ for(const policy of ['keep-local','use-incoming']){
+  const local=await make('로컬 번역'),text='  BAD 99 <i>원형 보존</i>\r\n{other}  ',incoming=await make(text);
+  await baseline([local]);let r=await perform(route,[incoming],policy);
+  check(`${route} ${policy} mismatched duplicate warning follows actual writes`,()=>{assert.equal(r.ok,true);assert.equal(r.imported,policy==='keep-local'?0:1);assert.equal(r.validationWarnings,policy==='keep-local'?0:1);assert.equal(cache.get(local.id).text,policy==='keep-local'?local.text:text);});
+  await baseline([]);r=await perform(route,[incoming,incoming],policy);
+  check(`${route} ${policy} mismatched bytes persist with one warning per deduplicated write`,()=>{assert.equal(r.ok,true);assert.equal(r.imported,1);assert.equal(r.skipped,1);assert.equal(r.validationWarnings,1);assert.equal(cache.get(incoming.id).text,text);});
+  const exported=await send({type:'EXPORT_CACHE'});
+  check(`${route} ${policy} imported mismatched row exports without content changes`,()=>{assert.equal(exported.ok,true);assert.equal(exported.data.entries.find(e=>e.id===incoming.id).text,text);});
+ }
 }
 const seed=await make('안전한 기존 번역',true);await baseline([seed]);
 for(const conflictPolicy of [null,'','KEEP_LOCAL','incoming',true,1,{},[]])for(const mode of ['merge','replace']){
@@ -45,8 +54,8 @@ for(const conflictPolicy of [null,'','KEEP_LOCAL','incoming',true,1,{},[]])for(c
 }
 for(const mode of ['merge','replace']){
  const s=await send({type:'IMPORT_START',mode,conflictPolicy:'use-incoming'});const row=await make('안전한 파일 번역');const before=JSON.stringify([...cache]),n=count();
- let r=await send({type:'IMPORT_BATCH',token:s.token,entries:[{...cm.portableEntry(row),text:'BAD 99'}]});
- check(`${mode} invalid staging cannot modify live rows/count`,()=>{assert.equal(r.ok,false);assert.equal(JSON.stringify([...cache]),before);assert.equal(count(),n);assert.equal(metadata().get('transfer:'+s.token).inputCount,0);});
+ let r=await send({type:'IMPORT_BATCH',token:s.token,entries:[{...cm.portableEntry(row),text:42}]});
+ check(`${mode} structural invalid staging cannot modify live rows/count`,()=>{assert.equal(r.ok,false);assert.equal(JSON.stringify([...cache]),before);assert.equal(count(),n);assert.equal(metadata().get('transfer:'+s.token).inputCount,0);});
  await send({type:'IMPORT_BATCH',token:s.token,entries:[cm.portableEntry(row)]});
  r=await send({type:'IMPORT_COMMIT',token:s.token,header,expectedCount:2});check(`${mode} truncated input count rejected atomically`,()=>{assert.equal(r.ok,false);assert.equal(JSON.stringify([...cache]),before);assert.equal(count(),n);});
  for(const [key,value]of stagedRows())if(value.token===s.token)stagedRows().delete(key);

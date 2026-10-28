@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const DEFAULTS = Object.freeze({provider:'openai',endpoint:'https://api.openai.com/v1',model:'',apiKey:'',target:'한국어',enabled:false,consent:false,cacheOnly:false,cacheEnabled:true,translateLatin:true,fontFamily:'Malgun Gothic',maxBatchChars:6000,dailyCharLimit:0,dailyRequestLimit:0,maxOutputTokens:4096,requestTimeoutSeconds:180,retryLimit:0});
+  const DEFAULTS = Object.freeze({provider:'openai',endpoint:'https://api.openai.com/v1',model:'',apiKey:'',target:'한국어',enabled:false,consent:false,cacheOnly:false,cacheEnabled:true,translateLatin:true,fontFamily:'Malgun Gothic',playerName:'',displayName:'',maxBatchChars:6000,dailyCharLimit:0,dailyRequestLimit:0,maxOutputTokens:4096,requestTimeoutSeconds:180,retryLimit:0});
   const PRESETS = Object.freeze({chatgpt:'https://api.openai.com/v1',openai:'https://api.openai.com/v1',gemini:'https://generativelanguage.googleapis.com/v1beta',anthropic:'https://api.anthropic.com/v1',custom:'http://127.0.0.1:1234/v1'});
   const FIELDS = Object.keys(DEFAULTS);
   const MAX_CACHE_BYTES = 32 * 1024 * 1024; // Small legacy whole-JSON fallback only.
@@ -227,6 +227,7 @@
     for (const name of FIELDS) $(name).removeAttribute('aria-invalid');
     const settings = {};
     for (const name of FIELDS) settings[name] = $(name).type === 'checkbox' ? $(name).checked : $(name).value.trim();
+    for (const name of ['playerName','displayName']) if (settings[name].length > 64 || /[<>{}\r\n]/.test(settings[name])) return invalid(name,'이름은 64자 이하이며 태그·중괄호·줄바꿈을 사용할 수 없습니다.');
     if (action === 'TEST' && settings.cacheOnly) return invalid('cacheOnly','연결 테스트를 하려면 캐시 전용 모드를 먼저 끄세요. API 인증 정보와 전송 동의도 필요합니다.');
     const chatgpt = settings.provider === 'chatgpt';
     if (chatgpt) { settings.endpoint = PRESETS.chatgpt; settings.apiKey = ''; }
@@ -639,8 +640,9 @@
       const response = await importStream(file,mode,conflictPolicy);
       if (!response) { status('가져오기를 취소했습니다. 기존 캐시는 변경하지 않았습니다.'); transferProgress('가져오기 취소'); return; }
       $('cacheCount').textContent = numberFormat.format(response.cacheCount) + ' 개';
-      transferProgress('가져오기 완료 · ' + policyLabel);
-      status('가져오기 완료 (' + policyLabel + '): ' + numberFormat.format(response.imported) + '개 반영, ' + numberFormat.format(response.skipped) + '개 건너뜀. 현재 캐시 ' + numberFormat.format(response.cacheCount) + '개. 캐시 전용 모드에서도 사용할 수 있습니다.','success');
+      const warnings = Number.isSafeInteger(response.validationWarnings) ? response.validationWarnings : 0;
+      transferProgress('가져오기 완료 · ' + policyLabel + ' · 내용 차이 경고 ' + numberFormat.format(warnings) + '개');
+      status('가져오기 완료 (' + policyLabel + '): ' + numberFormat.format(response.imported) + '개 반영, ' + numberFormat.format(response.skipped) + '개 건너뜀. 현재 캐시 ' + numberFormat.format(response.cacheCount) + '개. 반영 항목의 수치·태그·변수·줄바꿈 차이 경고 ' + numberFormat.format(warnings) + '개. 경고 항목도 파일 번역문 그대로 저장·적용합니다.',warnings ? 'warning' : 'success');
     } catch (error) { fail(error); transferProgress('가져오기 중단 · 완료 전에는 기존 캐시를 교체하지 않습니다'); }
     finally { $('cacheFile').value = ''; setBusy(false); }
   });
@@ -663,12 +665,15 @@
   });
   $('clearCache').addEventListener('click', async () => {
     if (busy || !loaded) return;
-    if (!window.confirm('저장된 번역 캐시를 비울까요? 같은 문구를 다시 번역하면 비용 또는 사용량이 발생할 수 있습니다.')) return;
+    if (!window.confirm('캐시 전체 초기화 · 되돌릴 수 없음\n모든 언어의 저장 번역·수동 수정·번역 편집 초안과 이전 파일 전송 작업을 삭제합니다. 게임에 표시된 번역도 갱신합니다.\n연결·언어·글꼴·이름·On/Off 설정과 저장하지 않은 설정 입력값, 사용량 기록, 배포 기록, 디스크 파일은 유지합니다.\n자동 번역이 켜져 있으면 현재 화면을 포함해 다시 번역하면서 비용·사용량이 발생할 수 있습니다. 빈 상태를 유지하려면 먼저 자동 번역을 꺼 주세요. 초기화할까요?')) return;
     setBusy(true);
     try {
-      await send('CLEAR_CACHE');
-      $('cacheCount').textContent = '0 개';
-      status('번역 캐시를 비웠습니다. 연결 설정은 변경하지 않았습니다.','success');
+      await send('CLEAR_CACHE',{confirmed:true});
+      activeImportToken = null; activeExportToken = null;
+      $('cacheCount').textContent = '0 개'; $('cacheFile').value = '';
+      document.dispatchEvent(new Event('cachecleared'));
+      transferProgress('캐시 전체 초기화 완료');
+      status('모든 번역 캐시와 편집 초안을 초기화했습니다. 설정 입력값·사용량·배포 기록·디스크 파일은 유지했습니다. 자동 번역이 켜져 있으면 다시 번역할 수 있습니다.','success');
     } catch (error) { fail(error); }
     finally { setBusy(false); }
   });
@@ -683,11 +688,25 @@
     } catch (error) { fail(error); }
     finally { setBusy(false); }
   });
+  $('reloadExtension').addEventListener('click', () => {
+    if (busy) return;
+    try { chrome.runtime.reload(); }
+    catch (error) { fail(error); status('확장 다시 로드에 실패했습니다. chrome://extensions에서 이 확장의 새로고침을 누른 뒤 게임도 새로고침하세요.','error'); }
+  });
   async function init() {
     applySettings(DEFAULTS);
     setBusy(true);
     try {
       const response = await send('GET_SETTINGS');
+      const currentVersion = $('popupVersion').textContent.trim();
+      const compatible = response.version === currentVersion && response.capabilities?.playerNames === true && response.capabilities?.cacheClear === true && response.capabilities?.warningImports === true && response.capabilities?.backlogReuse === true && response.capabilities?.storyAutoAdvance === true && response.capabilities?.recorderRecovery === true;
+      $('runtimeNotice').hidden = compatible;
+      if (!compatible) {
+        loaded = false; $('savedState').textContent = '확장 다시 로드 필요';
+        $('runtimeVersions').textContent = '팝업 v' + currentVersion + ' / 백그라운드 v' + (response.version || '알 수 없음');
+        status('팝업과 실행 중인 백그라운드가 다릅니다. 상단의 확장 다시 로드를 누르고 팝업·게임을 다시 열거나 새로고침하세요. 저장된 캐시와 설정은 유지됩니다.','warning');
+        return;
+      }
       applySettings(response.settings);
       displayUsage(response.usage,response.cacheCount);
       loaded = true;

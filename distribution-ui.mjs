@@ -1,7 +1,8 @@
 import {createDistributionFileStore} from './distribution-files.mjs';
 import {checkPortableShape,validatePortableEntries,byteSize} from './cache.mjs';
+import {VERSION} from './core.mjs';
 const MAX_ROWS=250,MAX_BYTES=1024*1024;
-const fallbackHeader=()=>({format:'crave-ai-translation-cache',version:3,identity:'source-v3',exportedAt:new Date().toISOString(),appVersion:'0.3.5'});
+const fallbackHeader=()=>({format:'crave-ai-translation-cache',version:3,identity:'source-v3',exportedAt:new Date().toISOString(),appVersion:VERSION});
 function headerValue(raw){
   if(raw===undefined)return fallbackHeader();
   const keys=['format','version','identity','exportedAt','appVersion'];
@@ -11,7 +12,7 @@ function headerValue(raw){
 export function createDistributionUI({win=globalThis.window,doc=globalThis.document,runtime=globalThis.chrome?.runtime,files=createDistributionFileStore()}={}){
   const node=id=>doc.getElementById(id),button=node('primary');
   const intent=new URLSearchParams(win.location.search).get('intent');
-  let session,handle,header,busy=true,mode='loading',closedFile=false,partialApproved=false;
+  let session,handle,header,busy=true,mode='loading',closedFile=false,partialApproved=false,automatic=false;
   const status=(text,tone='normal')=>{node('status').textContent=text;node('status').dataset.tone=tone;};
   function action(next,label){mode=next;button.textContent=label;button.disabled=busy||next==='done';}
   function show(s){session=s;node('target').textContent=typeof s.target==='string'?s.target:'확인 중';node('count').textContent=String(s.count??0);node('fileName').textContent=typeof s.fileName==='string'?s.fileName:'선택 전';}
@@ -35,7 +36,7 @@ export function createDistributionUI({win=globalThis.window,doc=globalThis.docum
       const chosen=await promise;selectionId=await files.put(chosen);
       const result=await send(isStart?'DISTRIBUTION_START':'DISTRIBUTION_RESELECT',{...(isStart?{}:{id:session.id}),fileName:chosen.name,selectionId});accepted=true;
       const previous=session?.selectionId;
-      if(isStart){show(result.session);node('heading').textContent='수집 중';status('Start 완료. 창을 닫아도 수집은 계속됩니다. 게임에서 Finish를 눌러 저장하세요.');action('done','수집 중 · 창을 닫아도 됩니다');}
+      if(isStart){show(result.session);node('heading').textContent='수집 중';status('Start 완료. 창을 닫아도 수집은 계속됩니다. 게임에서 Finish를 누르거나 게임을 새로고침하면 파일 기록을 마감합니다.');action('done','수집 중 · 창을 닫아도 됩니다');}
       else{
         // Reselect ack need not echo the full session. Identity stays frozen.
         show({...session,...result.session,fileName:chosen.name,selectionId});handle=chosen;
@@ -50,6 +51,7 @@ export function createDistributionUI({win=globalThis.window,doc=globalThis.docum
     catch{status('파일 쓰기는 완료되었지만 저장 완료 확인에 실패했습니다. 파일이 이미 존재할 수 있습니다. 확인을 다시 시도하세요. 수집 데이터는 보존됩니다.','error');action('ack','저장 완료 확인 다시 시도');return;}
     let cleaned=true;try{await files.delete(session.selectionId);}catch{cleaned=false;}
     status('Finish 완료. '+session.count+'개 항목을 파일에 저장했습니다.'+(cleaned?'':' 로컬 파일 권한 참조 정리에 실패했습니다.'));action('done','저장 완료');
+    if(automatic&&typeof win.close==='function')win.close();
   }
   async function save(){
     let writer;
@@ -91,6 +93,7 @@ export function createDistributionUI({win=globalThis.window,doc=globalThis.docum
   async function initialize(){busy=true;button.disabled=true;try{
     if(typeof intent!=='string'||!/^[a-f0-9-]{36}$/i.test(intent))throw Error('INVALID_INTENT');
     const result=await send('DISTRIBUTION_WINDOW_GET');
+    automatic=result.automatic===true;
     if(result.session)show(result.session);
     if(result.action==='start'){node('heading').textContent='배포용 수집 시작';node('description').textContent='저장 위치를 선택하면 새 번역 수집을 시작합니다.';if(canPick()){status('Start에서는 파일을 쓰거나 비우지 않습니다.');action('start','저장 위치 선택하고 Start');}}
     else if(result.action==='finish'){node('description').textContent='수집을 멈추고 배포 파일을 저장합니다.';await freeze();}

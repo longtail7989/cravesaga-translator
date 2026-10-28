@@ -4,8 +4,8 @@
 
 ## 준비
 1. 새 확장 릴리스가 필요할 때만 `manifest.json`과 `core.mjs`의 버전을 함께 변경합니다. helper 저장소 분리만으로 버전을 올리거나 새 확장 릴리스를 만들지 않습니다.
-2. `node scripts/test.mjs`로 확장 전용 오프라인 CJS suite 22개(독립 실행 20개 + worker에 포함된 2개)를 검증합니다. native-client mock은 유지하며 실제 로그인·제공자 번역 요청·별도 helper 테스트는 하지 않습니다.
-3. `node scripts/build-extension.mjs --out dist --tag v0.3.5`로 확장만 빌드합니다. 예시 버전은 실제 새 릴리스에 맞춥니다. Node.js 22.13 이상을 사용하며 Actions는 Windows·PowerShell 7에서 실행합니다.
+2. `node scripts/test.mjs`로 확장 전용 오프라인 CJS suite 26개(독립 실행 24개 + worker에 포함된 2개)를 검증합니다. native-client mock은 유지하며 실제 로그인·제공자 번역 요청·별도 helper 테스트는 하지 않습니다.
+3. `node scripts/build-extension.mjs --out dist --tag v0.3.10`으로 확장만 빌드합니다. 예시 버전은 실제 새 릴리스에 맞춥니다. Node.js 22.13 이상을 사용하며 Actions는 Windows·PowerShell 7에서 실행합니다.
 4. 설정·토큰·프로필·개인 캐시·게임 원문 수집 파일이 Git 변경 목록에 없는지 확인합니다. 확장 빌드는 명시적인 파일 허용 목록만 사용합니다.
 
 ## 향후 새 확장 릴리스 게시

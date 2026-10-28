@@ -19,8 +19,9 @@ function fixture(options={}){
  if(!options.missing)storage.set(selectionId,handle);
  const files={async put(h){events.push('put');if(options.quota)throw Object.assign(Error('quota'),{name:'QuotaExceededError'});storage.set(selectionId,h);return selectionId},async get(id){events.push('get');return storage.get(id)},async delete(id){events.push('delete');deleted.push(id);storage.delete(id)}};
  const win={location:{search:'?intent='+intent},showSaveFilePicker(o){assert.equal(o.types[0].accept['application/x-ndjson'][0],'.ndjson');events.push('picker');return options.cancel?Promise.reject(Object.assign(Error('cancel'),{name:'AbortError'})):Promise.resolve(handle)}};if(options.unsupported)delete win.showSaveFilePicker;
+ win.close=()=>events.push('window-close');
  const runtime={async sendMessage(m){events.push(m.type);calls.push(m);if(options.reply)return options.reply(m);switch(m.type){
- case 'DISTRIBUTION_WINDOW_GET':return {ok:true,action:options.start?'start':'finish',session};
+ case 'DISTRIBUTION_WINDOW_GET':return {ok:true,action:options.start?'start':'finish',automatic:options.automatic===true,session};
  case 'DISTRIBUTION_FREEZE':return {ok:true,status:'ready',session:{...session,...options.session},count:options.session?.count??1};
  case 'DISTRIBUTION_START':return options.startFailed?{ok:false}:{ok:true,session:{...session,status:'recording'}};
  case 'DISTRIBUTION_RESELECT':return {ok:true,session};
@@ -43,7 +44,18 @@ await test('failed Start cleans selection; cancellation and quota retry safely',
 await test('no picker support never downloads or starts',async()=>{const f=fixture({start:true,unsupported:true});await f.app.initialize();assert(f.node('primary').disabled);assert(f.node('status').textContent.includes('지원하지'));assert.equal(f.calls.length,1)});
 await test('Finish freezes before handle; granted autosave; NDJSON preserves metadata; close before ack',async()=>{
  const f=fixture();await f.app.initialize();assert(f.events.indexOf('DISTRIBUTION_FREEZE')<f.events.indexOf('get'));assert(f.events.indexOf('close')<f.events.indexOf('DISTRIBUTION_SAVED'));assert(!f.events.includes('request'));
- const lines=f.writes.join('').trim().split('\n').map(JSON.parse);assert.equal(lines[0].identity,'source-v3');assert.equal(lines[0].appVersion,'0.3.5');assert.deepEqual(lines[1],row);assert.deepEqual(lines[2],{end:true,count:1});assert.deepEqual(f.deleted,[selectionId]);assert.equal(f.node('primary').textContent,'저장 완료');
+ const lines=f.writes.join('').trim().split('\n').map(JSON.parse);assert.equal(lines[0].identity,'source-v3');assert.deepEqual(lines[1],row);assert.deepEqual(lines[2],{end:true,count:1});assert.deepEqual(f.deleted,[selectionId]);assert.equal(f.node('primary').textContent,'저장 완료');
+});
+await test('automatic Finish returns to game only after durable file close and save acknowledgment',async()=>{
+ const f=fixture({automatic:true});await f.app.initialize();
+ assert(f.events.indexOf('close')<f.events.indexOf('DISTRIBUTION_SAVED'));
+ assert(f.events.indexOf('DISTRIBUTION_SAVED')<f.events.indexOf('window-close'));
+ const manual=fixture();await manual.app.initialize();assert(!manual.events.includes('window-close'),'explicit manual Finish keeps its result window');
+});
+await test('automatic Finish keeps recovery window open for permissions, partial data and failed write/ack',async()=>{
+ for(const opts of [{permission:'prompt'},{closeError:true},{ackFailed:true},{session:{errorCode:'STORAGE'}}]){
+  const f=fixture({automatic:true,...opts});await f.app.initialize();assert(!f.events.includes('window-close'));assert.equal(f.deleted.length,0);
+ }
 });
 await test('permission request synchronous trusted-only; denial preserves ready',async()=>{
  const f=fixture({permission:'prompt',denied:true});await f.app.initialize();assert(!f.events.includes('create'));await f.click(false);assert(!f.events.includes('request'));const p=f.click();assert.equal(f.events.at(-1),'request');await p;assert(!f.events.includes('create'));assert.equal(f.deleted.length,0);assert(f.node('status').textContent.includes('보존'));

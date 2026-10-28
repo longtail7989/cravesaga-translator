@@ -2,17 +2,26 @@
 // Mock UI only. No browser, login, real provider calls or CLI execution.
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=process.env.CRAVE_AI_ROOT||path.resolve(__dirname,'..'),source=fs.readFileSync(path.join(root,'options.js'),'utf8'),html=fs.readFileSync(path.join(root,'popup.html'),'utf8');
+const appVersion=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8')).version;
 function fixture(raw={}){
  const nodes=new Map(),calls=[],confirms=[];
  const node=id=>{if(!nodes.has(id))nodes.set(id,{id,value:'',type:['enabled','consent','cacheOnly','translateLatin'].includes(id)?'checkbox':'text',checked:false,disabled:false,hidden:false,required:false,dataset:{},attrs:{},handlers:{},textContent:'',children:[],classList:{toggle(){},add(){},remove(){}},setAttribute(k,v){this.attrs[k]=v},removeAttribute(k){delete this.attrs[k]},addEventListener(k,f){this.handlers[k]=f},focus(){},replaceChildren(...items){this.children=items}});return nodes.get(id)};
  for(const [id,min,max] of [['maxBatchChars',1000,12000],['dailyCharLimit',0,10000000],['dailyRequestLimit',0,100000],['maxOutputTokens',512,16384],['requestTimeoutSeconds',30,240],['retryLimit',0,20]])Object.assign(node(id),{min:String(min),max:String(max)});
- let responder=m=>m.type==='GET_SETTINGS'?{ok:true,settings:raw,usage:{},cacheCount:0}:m.type==='LIST_MODELS'?{ok:true,models:[{id:'approved-model'}]}:{ok:true,settings:m.settings,text:'번역'};
+ node('popupVersion').textContent=appVersion;
+ let responder=m=>m.type==='GET_SETTINGS'?{ok:true,version:appVersion,capabilities:{playerNames:true,cacheClear:true,warningImports:true,backlogReuse:true,storyAutoAdvance:true,recorderRecovery:true},settings:raw,usage:{},cacheCount:0}:m.type==='LIST_MODELS'?{ok:true,models:[{id:'approved-model'}]}:{ok:true,settings:m.settings,text:'번역'};
  const state={confirm:true};
  const ctx={console,URL,Intl,Date,Number,Object,Error,Promise,TextEncoder,TextDecoder,Blob,setTimeout,Event:class{},CustomEvent:class{},window:{addEventListener(){},confirm(t){confirms.push(t);return state.confirm}},document:{getElementById:node,querySelectorAll(){return[]},dispatchEvent(){},createElement(){return{}},body:{append(){}}},chrome:{runtime:{sendMessage(m,cb){calls.push(m);cb(responder(m))}},permissions:{request(p,cb){cb(true)}}}};
  ctx.globalThis=ctx;vm.runInNewContext(source.replace('  init();','  globalThis.ui={init,collect,applySettings,syncProvider,ready(){loaded=true;syncProvider()}};'),ctx);ctx.ui.applySettings(raw);ctx.ui.ready();
  return{node,calls,confirms,state,ui:ctx.ui,respond(f){responder=f},change(provider){node('provider').value=provider;node('provider').handlers.change()},fire(id){node(id).handlers.click()},async flush(){await new Promise(r=>setImmediate(r));await new Promise(r=>setImmediate(r))}};
 }
 test('[MOCKED] upgrade preserves supported API settings without autosave or requests',async()=>{for(const provider of ['openai','anthropic','custom']){const raw={provider,endpoint:'https://example.test/v1',model:'existing',apiKey:'saved-key',enabled:true,consent:true},f=fixture(raw);await f.ui.init();assert.deepEqual(f.calls.map(m=>m.type),['GET_SETTINGS']);for(const k of ['provider','endpoint','model','apiKey'])assert.equal(f.node(k).value,raw[k]);}});
+test('[MOCKED] old recorder worker cannot silently pass the settings gate or accept mutations',async()=>{
+ for(const legacyVersion of ['0.3.7',appVersion]){
+  const f=fixture();f.respond(()=>({ok:true,version:legacyVersion,capabilities:{playerNames:true,cacheClear:true,warningImports:true,backlogReuse:true,storyAutoAdvance:true},settings:{provider:'openai',model:'old',apiKey:'retained-secret'},usage:{},cacheCount:4}));
+  await f.ui.init();assert.equal(f.node('runtimeNotice').hidden,false);assert.equal(f.ui.collect('SAVE_SETTINGS'),null);
+  assert.deepEqual(f.calls.map(m=>m.type),['GET_SETTINGS']);assert(!f.node('runtimeVersions').textContent.includes('retained-secret'));
+ }
+});
 test('[MOCKED] old providers cannot be selected or trigger model/test/save requests',async()=>{for(const provider of ['codex','claude-code']){const f=fixture();f.change(provider);for(const action of ['SAVE_SETTINGS','LIST_MODELS','TEST'])assert.equal(f.ui.collect(action),null);f.fire('loadModels');f.fire('testConnection');await f.flush();assert.equal(f.calls.length,0);}});
 test('[MOCKED] unsupported saved provider is shown paused without API billing fallback',()=>{const f=fixture({provider:'codex',enabled:true,consent:true,model:'old',apiKey:'legacy',endpoint:'http://localhost:17863'});assert.equal(f.node('provider').value,'openai');assert.equal(f.node('enabled').checked,false);assert.equal(f.node('consent').checked,false);assert.equal(f.node('model').value,'');assert.equal(f.node('apiKey').value,'');assert.equal(f.calls.length,0);});
 test('[MOCKED] API model and authentication remain required and removed token never leaves UI',()=>{for(const provider of ['openai','anthropic']){const f=fixture();f.change(provider);assert(f.node('model').required);assert.equal(f.ui.collect('SAVE_SETTINGS'),null);f.node('model').value='api-model';assert.equal(f.ui.collect('SAVE_SETTINGS'),null);f.node('apiKey').value='api-key';const s=f.ui.collect('SAVE_SETTINGS');assert(s);assert.equal(s.apiKey,'api-key');assert(!Object.hasOwn(s,'bridgeToken'));}});

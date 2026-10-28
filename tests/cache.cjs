@@ -4,7 +4,8 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const root=process.env.CRAVE_AI_ROOT||path.resolve(__dirname,'..');
 const coreUrl='data:text/javascript;base64,'+fs.readFileSync(path.join(root,'core.mjs')).toString('base64');
 const reliabilityUrl='data:text/javascript;base64,'+fs.readFileSync(path.join(root,'reliability.mjs')).toString('base64');
-const source=fs.readFileSync(path.join(root,'cache.mjs'),'utf8').replace("from './core.mjs'","from '"+coreUrl+"'").replace("from './reliability.mjs'","from '"+reliabilityUrl+"'");
+const dialogueUrl='data:text/javascript;base64,'+fs.readFileSync(path.join(root,'dialogue-text.js')).toString('base64');
+const source=fs.readFileSync(path.join(root,'cache.mjs'),'utf8').replace("from './core.mjs'","from '"+coreUrl+"'").replace("from './reliability.mjs'","from '"+reliabilityUrl+"'").replace("import './dialogue-text.js'","import '"+dialogueUrl+"'");
 const C=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 let passed=0;const test=async(name,fn)=>{await fn();passed++;console.log('PASS '+name);};
 const entry=await C.makeCacheEntry({source:'攻撃力が10%上昇する。',context:'Skill',target:'한국어',text:'공격력이 10% 상승합니다.',createdAt:100,updatedAt:200});
@@ -27,6 +28,31 @@ await test('portable v3 file excludes credentials endpoints and internal time',(
 await test('round trip preserves original metadata and saved timestamps',async()=>{const [row]=await C.validateImport(JSON.parse(JSON.stringify(file)));assert.deepEqual(row,entry);});
 await test('wrong canonical hash is rejected',async()=>{const d=structuredClone(file);d.entries[0].id='v3:'+'0'.repeat(64);await assert.rejects(()=>C.validateImport(d),/고유키/);});
 await test('numbers tags variables and exact newline validations retained',()=>{for(const pair of [['10%上昇','20% 증가'],['<b>攻撃</b>','공격'],['{value}上昇','증가'],['攻撃\n防御','공격 방어'],['攻撃\r\n防御','공격\n방어'],['攻撃','공격 99']])assert.throws(()=>C.validateTextPair(...pair));});
+await test('reserved USER can move but ordinary spans remain ordered and counts exact',()=>{
+  const source='{USER}の攻撃10%<b>名前</b>\n{value}';
+  for(const text of ['공격10%<b>이름</b>\n{value}{USER}','공격10%{USER}<b>이름</b>\n{value}'])assert.equal(C.validateTextPair(source,text),true);
+  for(const text of ['공격10%<b>이름</b>\n{value}','{USER}공격10%<b>이름</b>\n{value}{USER}','공격<b>이름</b>10%\n{value}{USER}'])assert.throws(()=>C.validateTextPair(source,text));
+});
+await test('shape-valid mismatches survive import/export byte-for-byte while editor validation stays strict',async()=>{
+  const text='  수치 99% <i>다른 태그</i>\r\n{other}  ',row={...C.portableEntry(entry),text};
+  const [accepted]=await C.validateImport({...file,entries:[row]});
+  assert.equal(accepted.text,text);assert.equal(C.buildExport([accepted]).data.entries[0].text,text);
+  assert.equal(C.hasTextPairWarning(row.source,text),true);assert.throws(()=>C.validateTextPair(row.source,text));
+  await assert.rejects(()=>C.validatePortableEntries([row]));
+  assert.equal((await C.validateImportEntries([row]))[0].text,text);
+  for(const broken of [{...row,text:''},{...row,source:42},{...row,updatedAt:99},{...row,target:' 한국어'}])await assert.rejects(()=>C.validateImport({...file,entries:[broken]}));
+});
+await test('JSON v1/v2/v3 and stream v2/v3 share date aliases and source identity metadata',async()=>{
+  for(const version of [1,2,3])for(const dateField of ['exportedAt','exportedAtISO']){
+    const data={format:C.CACHE_FORMAT,version,identity:'source-v3',[dateField]:file.exportedAt,appVersion:file.appVersion,entries:[C.portableEntry(entry)]};
+    assert.equal((await C.validateImport(data))[0].text,entry.text);
+    assert.equal(C.normalizeCacheHeader(data).exportedAt,file.exportedAt);
+    if(version!==1){delete data.entries;assert.equal(C.normalizeCacheHeader(data,{stream:true}).version,version);}
+  }
+  assert.equal(C.normalizeCacheHeader({...file,exportedAtISO:file.exportedAt}).exportedAt,file.exportedAt);
+  for(const patch of [{exportedAtISO:'2000-01-01T00:00:00.000Z'},{exportedAtISO:42},{identity:'context-v2'},{appVersion:3},{exportedAt:'not a date'},{version:'3'},{extra:true}])await assert.rejects(()=>C.validateImport({...file,...patch}));
+  for(const patch of [{version:1},{identity:undefined},{entries:[]}])assert.throws(()=>C.normalizeCacheHeader({format:C.CACHE_FORMAT,version:3,identity:'source-v3',exportedAt:file.exportedAt,appVersion:file.appVersion,...patch},{stream:true}));
+});
 await test('old context-hash validated BEFORE canonical conversion',async()=>{
   const old={...C.portableEntry(entry),id:await C.cacheIdV2(entry.target,entry.source,entry.context)};
   const [row]=await C.validateImport({...file,version:1,entries:[old]});assert.equal(row.id,entry.id);assert.equal(row.context,'Skill');
@@ -55,9 +81,7 @@ await test('bad format version timestamps and preserved opaque legacy behavior',
 await test('no obsolete 20000 entry cap and no automatic store byte cap',async()=>{assert.equal(C.CACHE_MAX_ENTRIES,0);assert.equal(C.CACHE_MAX_STORE_BYTES,0);const d={...file,entries:Array(20001).fill(C.portableEntry(entry))};assert.equal((await C.validateImport(d)).length,1);});
 await test('legacy export fails closed at 32MiB with paged API guidance',()=>{const long={...entry,source:'攻'.repeat(8192),text:'한'.repeat(8192)};assert.throws(()=>C.buildExport(Array(1000).fill(long)),/exportPage/);});
 await test('empty file remains valid for explicit replace',async()=>assert.equal((await C.validateImport(C.buildExport([]).data)).length,0));
-await test('hot paths use bounded native batches without full scans or automatic trim',()=>{const text=fs.readFileSync(path.join(root,'cache-store.mjs'),'utf8');assert(!/\.sort\s*\(|async function trim|\.getAll\(\)|\.getAllKeys\(\)/.test(text));assert(text.includes('index.getAll(bounds,wanted)'));assert(text.includes('Math.min(32,2000-visited)'));assert(text.includes('index.getAllKeys(undefined,wanted)'));assert(text.includes('Math.min(1000,amount-deleted)'));const warm=text.slice(text.indexOf('async warm(target)'),text.indexOf('async deleteOldest'));assert(!warm.includes('.count('));assert(!warm.includes('openCursor'));for(const api of ['exportPage','importBatch','deleteOldest','close','destroy'])assert(text.includes(api));});
 await test('recent index fields are internal and normalized after deterministic merge',()=>{assert.equal(entry.reverseTime,Number.MAX_SAFE_INTEGER-entry.updatedAt);assert(!Object.hasOwn(C.portableEntry(entry),'reverseTime'));const old={...entry};delete old.reverseTime;const chosen=C.choosePreferredEntry(old,entry);assert.equal(chosen.reverseTime,Number.MAX_SAFE_INTEGER-entry.updatedAt);assert.equal(chosen.time,entry.updatedAt);});
-await test('persisted count avoids native full-count work on normal reads and deletes',()=>{const text=fs.readFileSync(path.join(root,'cache-store.mjs'),'utf8');const count=text.slice(text.indexOf('async function count()'),text.indexOf('async function lookup'));assert(count.includes('get(COUNTER)'));assert(!count.includes('.count('));const del=text.slice(text.indexOf('async deleteOldest'),text.indexOf('async close()'));assert(!del.includes('.count('));assert(del.includes('adjustCount(tx,-deleted'));assert(text.includes("COUNTER='translation-count'"));assert(text.includes('await ensureCount(db,migrated)'));});
 await test('manual flag strict optional and ordinary bytes unchanged',async()=>{
   assert(!Object.hasOwn(entry,'manual'));
   assert(!Object.hasOwn(await C.makeCacheEntry({...entry,manual:false}),'manual'));

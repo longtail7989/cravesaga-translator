@@ -1,12 +1,14 @@
-import {DEFAULTS,sanitizeSettings,isConfigured,publicConfig,wantsTranslation,protect,restore,makePrompt,parseTranslations,redact,providerRequest,extractProviderText} from './core.mjs';
+import {VERSION,DEFAULTS,sanitizeSettings,isConfigured,publicConfig,wantsTranslation,protect,restore,makePrompt,parseTranslations,redact,providerRequest,extractProviderText} from './core.mjs';
 import {createCacheStore} from './cache-store.mjs';
 import {createCacheTransfer} from './cache-transfer.mjs';
 import {createCacheEditor} from './cache-editor.mjs';
 import {createDistributionBroker,distributionErrorResponse} from './distribution-broker.mjs';
-import {cacheId} from './cache.mjs';
+import {cacheId,validateTextPair} from './cache.mjs';
 import {createNetworkClient} from './network-client.mjs';
 import {createChatGPTClient} from './chatgpt-client.mjs';
 import {appError,failure,unchangedJapanese} from './reliability.mjs';
+import './dialogue-text.js';
+const dialogue=globalThis[Symbol.for('crave-ai-dialogue-text.v1')];
 const network=createNetworkClient();
 const chatgpt=createChatGPTClient();
 const gameTabs=new Map();
@@ -34,29 +36,58 @@ async function providerCall(s,prompt,checkpoint=async()=>{}){await checkpoint();
   const limited=s.provider==='gemini'?data.candidates?.[0]?.finishReason==='MAX_TOKENS':s.provider==='anthropic'?data.stop_reason==='max_tokens':data.choices?.[0]?.finish_reason==='length';if(limited)throw appError('OUTPUT_LIMIT',undefined,true);
   return extractProviderText(s.provider,data);
 }
+function validateTranslationItem(item,s){
+  if(!item||typeof item.id!=='string'||item.id.length>80||typeof item.source!=='string'||!item.source.trim()||item.source.length>8192||(item.context!=null&&(typeof item.context!=='string'||item.context.length>300)))throw appError('BAD_REQUEST','번역 요청 문구가 올바르지 않습니다.');
+  const templates=item.templates;
+  if(templates!==undefined&&(!Array.isArray(templates)||templates.length>2||templates.some(source=>typeof source!=='string'||!source.includes('{USER}')||source.length>8192)))throw appError('BAD_REQUEST','이름 공유 캐시 원문이 올바르지 않습니다.');
+  if(!wantsTranslation(item.source,s.translateLatin)&&item.source!=='{USER}'&&!templates?.includes('{USER}'))throw appError('BAD_REQUEST','번역할 수 있는 문구가 아닙니다.');
+  return item.source.length+(templates||[]).reduce((n,source)=>n+source.length,0);
+}
+async function lookupTranslation(item,s){
+  const literal=await cache.lookup(item,s);if(literal)return literal;
+  for(const source of item.templates||[]){const hit=await cache.lookup({source,context:item.context},s);if(hit)return hit;}
+  if(dialogue.isStory(item.context))for(const source of [item.source,...(item.templates||[])]){const hit=await cache.lookupDialogue({source,context:item.context},s);if(hit)return hit;}
+  return null;
+}
 async function translate(items,s,{test=false,revision:expectedRevision}={}){
   assertReady(s);
   if(!Array.isArray(items)||items.length>16)throw appError('BAD_REQUEST','번역 요청 항목 수가 올바르지 않습니다.');
   const seen=new Set(),groups=new Map();let chars=0;
-  for(const x of items){if(!x||typeof x.id!=='string'||x.id.length>80||seen.has(x.id)||!wantsTranslation(x.source,s.translateLatin))throw appError('BAD_REQUEST','번역 요청 문구가 올바르지 않습니다.');seen.add(x.id);if(x.context!=null&&(typeof x.context!=='string'||x.context.length>300))throw appError('BAD_REQUEST','문맥 길이가 올바르지 않습니다.');let g=groups.get(x.source);if(!g){g={item:x,ids:[]};groups.set(x.source,g);chars+=x.source.length;}g.ids.push(x.id);}
+  for(const x of items){validateTranslationItem(x,s);if(seen.has(x.id))throw appError('BAD_REQUEST','번역 요청 ID가 중복되었습니다.');seen.add(x.id);const key=JSON.stringify([x.source,...(x.templates||[]),dialogue.isStory(x.context)]);let g=groups.get(key);if(!g){g={item:x,ids:[]};groups.set(key,g);chars+=Math.max(x.source.length,...(x.templates||[]).map(source=>source.length));}g.ids.push(x.id);}
   if(chars>Math.max(8192,s.maxBatchChars))throw appError('BAD_REQUEST','한 번에 요청한 문구가 너무 깁니다.');
   const {configRevision:startRevision}=await chrome.storage.local.get('configRevision');if(expectedRevision!==undefined&&expectedRevision!==(startRevision??'initial'))throw appError('CANCELLED');
   const owned=[];let cacheSaved,storageWarning;
   const guard=async()=>{const live=await settings(),{configRevision}=await chrome.storage.local.get('configRevision');if(configRevision!==startRevision||(!test&&!live.enabled))throw appError('CANCELLED');};
   await locked(async()=>{
-    await guard();const misses=[];
-    for(const g of groups.values()){const hit=test||(!s.cacheOnly&&s.cacheEnabled===false)?null:await cache.lookup(g.item,s);if(hit)g.result={text:hit.text,cached:true};else if(!test&&s.cacheOnly)g.result={missing:true,error:'캐시 전용 모드: 저장되지 않은 문구는 원문으로 표시합니다.',code:'CACHE_MISS',retryable:false};else{g.key=JSON.stringify([startRevision??'initial',s.target,g.item.source]);const prior=test?null:pendingMap.get(g.key);if(prior){g.job=prior;g.shared=true;}else misses.push(g);}}
-    if(!test&&pendingMap.size+misses.length>512)throw appError('RATE_LIMIT',undefined,true,{retryAfterMs:5000});
-    for(const g of misses){let resolve;const promise=new Promise(r=>{resolve=r;});const job={key:g.key,promise,resolve,done:false,item:g.item,target:s.target};g.job=job;owned.push(job);if(!test)pendingMap.set(g.key,job);}
+    await guard();const misses=new Map();
+    for(const g of groups.values()){
+      const hit=test||(!s.cacheOnly&&s.cacheEnabled===false)?null:await lookupTranslation(g.item,s);
+      if(hit){g.result={text:hit.text,cached:true,cacheSource:hit.source};continue;}
+      if(!test&&s.cacheOnly){g.result={missing:true,error:'캐시 전용 모드: 저장되지 않은 문구는 원문으로 표시합니다.',code:'CACHE_MISS',retryable:false};continue;}
+      g.literalSource=g.item.source;
+      g.item={id:g.item.id,source:dialogue.canonical(g.item.templates?.[0]||g.item.source,g.item.context),context:g.item.context||''};
+      g.key=JSON.stringify([startRevision??'initial',s.target,g.item.source]);
+      const prior=test?null:pendingMap.get(g.key);
+      if(prior){g.job=prior;g.shared=true;}
+      else if(misses.has(g.key)){g.owner=misses.get(g.key);g.shared=true;}
+      else misses.set(g.key,g);
+    }
+    if(!test&&pendingMap.size+misses.size>512)throw appError('RATE_LIMIT',undefined,true,{retryAfterMs:5000});
+    for(const g of misses.values()){let resolve;const promise=new Promise(r=>{resolve=r;});if(!s.cacheOnly&&s.cacheEnabled===false)g.item.replaceSources=[];const job={key:g.key,promise,resolve,done:false,item:g.item,target:s.target};g.job=job;owned.push(job);if(!test)pendingMap.set(g.key,job);}
+    for(const g of groups.values()){if(g.owner)g.job=g.owner.job;if(!s.cacheOnly&&s.cacheEnabled===false&&g.job&&g.literalSource!==g.job.item.source&&!g.job.item.replaceSources.includes(g.literalSource))g.job.item.replaceSources.push(g.literalSource);}
   });
   async function runOwned(){
     try{
-      await locked(async()=>{await guard();const size=owned.reduce((n,j)=>n+j.item.source.length,0),usage=await getUsage();if(s.dailyRequestLimit>0&&usage.requests>=s.dailyRequestLimit)throw appError('QUOTA');if(s.dailyCharLimit>0&&usage.chars+size>s.dailyCharLimit)throw appError('QUOTA');await chrome.storage.local.set({usage:{date:today(),chars:usage.chars+size,requests:usage.requests+1}});});
-      const missing=owned.map(j=>j.item),prefix='P'+crypto.randomUUID().replace(/-/g,'').slice(0,10),records=new Map(missing.map(x=>[x.id,protect(x.source,prefix+x.id.replace(/[^a-zA-Z0-9]/g,'').slice(-12))]));
-      const prompt=makePrompt(missing.map(x=>({id:x.id,text:records.get(x.id).masked,context:x.context||''})),s.target);
-      const raw=await providerCall(s,prompt,guard);let parsed;try{parsed=parseTranslations(raw,missing.map(x=>x.id));}catch{throw appError('INVALID_RESPONSE',undefined,true);}
+      const missing=owned.filter(job=>job.item.source!=='{USER}').map(job=>job.item);
+      let parsed,records;
+      if(missing.length){
+        await locked(async()=>{await guard();const size=missing.reduce((n,item)=>n+item.source.length,0),usage=await getUsage();if(s.dailyRequestLimit>0&&usage.requests>=s.dailyRequestLimit)throw appError('QUOTA');if(s.dailyCharLimit>0&&usage.chars+size>s.dailyCharLimit)throw appError('QUOTA');await chrome.storage.local.set({usage:{date:today(),chars:usage.chars+size,requests:usage.requests+1}});});
+        const prefix='P'+crypto.randomUUID().replace(/-/g,'').slice(0,10);records=new Map(missing.map(x=>[x.id,protect(x.source,prefix+x.id.replace(/[^a-zA-Z0-9]/g,'').slice(-12))]));
+        const prompt=makePrompt(missing.map(x=>{const record=records.get(x.id);return {id:x.id,text:record.masked,context:x.context||'',nameTokens:record.values.filter(value=>value.value==='{USER}').map(value=>value.token)};}),s.target);
+        const raw=await providerCall(s,prompt,guard);try{parsed=parseTranslations(raw,missing.map(x=>x.id));}catch{throw appError('INVALID_RESPONSE',undefined,true);}
+      }
       const values=new Map(),toStore=[];
-      for(const job of owned){const item=job.item;try{const text=restore(parsed.get(item.id),records.get(item.id));if(unchangedJapanese(item.source,text,s.target))throw appError('UNTRANSLATED',undefined,true);values.set(job,{text,cached:false});if(!test)toStore.push({...item,text});}catch(e){const info=failure(e.code?e:appError('VALIDATION',undefined,true));values.set(job,{error:info.message,...info});}}
+      for(const job of owned){const item=job.item;try{const text=item.source==='{USER}'?'{USER}':restore(parsed.get(item.id),records.get(item.id));validateTextPair(item.source,text);if(unchangedJapanese(item.source,text,s.target))throw appError('UNTRANSLATED',undefined,true);values.set(job,{text,cached:false,cacheSource:item.source});if(!test)toStore.push({...item,text});}catch(e){const info=failure(e.code?e:appError('VALIDATION',undefined,true));values.set(job,{error:info.message,...info});}}
       // A joined job resolves only after this revision-guarded durable write finishes.
       await locked(async()=>{await guard();const activeWrites=toStore.filter(item=>owned.some(job=>!job.done&&job.item.source===item.source));if(activeWrites.length){try{await cache.put(activeWrites,s,{replaceExisting:!s.cacheOnly&&s.cacheEnabled===false});cacheSaved=true;}catch(e){if(!/quota|storage.?full|disk.?full|space/i.test(String(e?.name)+' '+String(e?.message)))throw e;cacheSaved=false;storageWarning='STORAGE_FULL';}}for(const job of owned){const value=values.get(job);if(typeof value.text==='string'&&!test){value.cacheSaved=cacheSaved===true;if(storageWarning)value.warning=value.storageWarning=storageWarning;}settle(job,value);}});
     }catch(e){const info=failure(e);for(const job of owned)settle(job,{error:info.message,...info});}
@@ -84,7 +115,8 @@ async function listModels(s){if(s.migrationRequired||!['openai','gemini','anthro
   const models=list.filter(x=>s.provider!=='gemini'||x.supportedGenerationMethods?.includes('generateContent')).map(x=>({id:String(x.id||x.name||'').replace(/^models\//,''),name:x.displayName||x.display_name||x.id||x.name})).filter(x=>x.id);
   return {ok:true,models};
 }
-async function saveCacheEdit(message){const result=await editor.save({id:message.id,source:message.source,target:message.target,text:message.text,expectedUpdatedAt:message.expectedUpdatedAt,expectedText:message.expectedText,create:message.create===true});for(const job of pendingMap.values())if(job.target===result.entry.target&&job.item.source===result.entry.source)settle(job,{text:result.entry.text,cached:true,manual:true,cacheSaved:true});await broadcastEdit(result.entry);return {ok:true,...result};}
+function relatedJob(job,entry){return job.target===entry.target&&(job.item.source===entry.source||(dialogue.isStory(job.item.context)&&dialogue.equivalent(job.item.source,entry.source)));}
+async function saveCacheEdit(message){const result=await editor.save({id:message.id,source:message.source,target:message.target,text:message.text,expectedUpdatedAt:message.expectedUpdatedAt,expectedText:message.expectedText,create:message.create===true});for(const job of pendingMap.values())if(relatedJob(job,result.entry))settle(job,{text:result.entry.text,cached:true,manual:true,cacheSaved:true,cacheSource:result.entry.source});await broadcastEdit(result.entry);return {ok:true,...result};}
 function assertGameCacheScope(message,s){if(typeof message.source!=='string'||!message.source.trim()||message.source.length>8192||typeof message.target!=='string'||message.target!==s.target)throw appError('BAD_REQUEST','현재 번역 언어의 올바른 문구만 편집할 수 있습니다.');}
 let distributionBroker;
 async function handle(message,sender){await accessReady;if(!message||typeof message.type!=='string')throw Error('잘못된 메시지입니다.');
@@ -97,8 +129,8 @@ async function handle(message,sender){await accessReady;if(!message||typeof mess
   if(message.type==='CACHE_LOOKUP'){
     if(!isGame(sender))throw Error('게임 프레임 전용 요청입니다.');const s=await settings();if(!s.enabled)return {ok:true,results:[]};
     const items=message.items;if(!Array.isArray(items)||items.length>32||items.reduce((n,x)=>n+(typeof x?.source==='string'?x.source.length:0),0)>131072)throw Error('캐시 조회 크기가 올바르지 않습니다.');
-    const ids=new Set();for(const x of items){if(!x||typeof x.id!=='string'||x.id.length>80||ids.has(x.id)||!wantsTranslation(x.source,s.translateLatin)||(x.context!=null&&(typeof x.context!=='string'||x.context.length>300)))throw Error('캐시 조회 항목이 올바르지 않습니다.');ids.add(x.id);}
-    const results=await Promise.all(items.map(async x=>{const hit=!s.cacheOnly&&s.cacheEnabled===false?null:await cache.lookup(x,s);return hit?{id:x.id,text:hit.text,cached:true}:{id:x.id,missing:true};}));return {ok:true,results};
+    const ids=new Set();let bytes=0;for(const x of items){bytes+=validateTranslationItem(x,s);if(ids.has(x.id)||bytes>131072)throw appError('BAD_REQUEST','캐시 조회 항목이 올바르지 않습니다.');ids.add(x.id);}
+    const results=await Promise.all(items.map(async x=>{const hit=!s.cacheOnly&&s.cacheEnabled===false?null:await lookupTranslation(x,s);return hit?{id:x.id,text:hit.text,cached:true,cacheSource:hit.source}:{id:x.id,missing:true};}));return {ok:true,results};
   }
   if(message.type==='TRANSLATE'){
     if(!isGame(sender))throw Error('게임 프레임 전용 요청입니다.');if(nativeReloadPending)throw appError('CANCELLED');checkRate(sender);
@@ -116,7 +148,7 @@ async function handle(message,sender){await accessReady;if(!message||typeof mess
     try{const result=await chrome.tabs.sendMessage(targetId,{type:message.type==='RETRY_FAILED'?'RETRY_FAILED':'GET_ENGINE_STATUS'});if(!result?.ok)throw Error('No game frame');if(message.type==='RETRY_FAILED')return {ok:true};return {ok:true,found:true,status:result.status||{},notice:String(result.notice||'').slice(0,350),cacheHits:Number(result.cacheHits)||0,queued:Number(result.queued)||0,retrying:Number(result.retrying)||0,lastErrorCode:String(result.lastErrorCode||''),nextRetryAt:Number(result.nextRetryAt)||0,attempts:Number(result.attempts)||0,failed:Number(result.failed)||0};}
     catch{if(message.type==='RETRY_FAILED')throw appError('BAD_REQUEST','게임 탭에서 다시 시도하세요.');return {ok:true,found:false,status:{},notice:'게임 탭이 아니거나 새로고침이 필요합니다.',cacheHits:0,queued:0};}
   }
-  if(message.type==='GET_SETTINGS'){return {ok:true,settings:await settings(),usage:await getUsage(),cacheCount:await cache.count()};}
+  if(message.type==='GET_SETTINGS'){return {ok:true,version:VERSION,capabilities:{playerNames:true,cacheClear:true,warningImports:true,backlogReuse:true,storyAutoAdvance:true,recorderRecovery:true},settings:await settings(),usage:await getUsage(),cacheCount:await cache.count()};}
   if(message.type==='CHATGPT_AUTH_REBIND'){
     const profileId=message.profileId;
     if(profileId!==undefined&&(typeof profileId!=='string'||!profileId||profileId.length>200))throw appError('BAD_REQUEST');
@@ -154,7 +186,7 @@ async function handle(message,sender){await accessReady;if(!message||typeof mess
   if(message.type==='CACHE_SEARCH')return {ok:true,...await editor.search({query:message.query??'',target:message.target,mode:message.mode??'contains',cursor:message.cursor??null,limit:message.limit??20})};
   if(message.type==='CACHE_GET')return {ok:true,...await editor.get({id:message.id})};
   if(message.type==='CACHE_EDIT_SAVE')return locked(()=>saveCacheEdit(message));
-  if(message.type==='CACHE_ENTRY_DELETE')return locked(async()=>{const result=await editor.remove({id:message.id,source:message.source,target:message.target,expectedUpdatedAt:message.expectedUpdatedAt,expectedText:message.expectedText});const info=failure(appError('CANCELLED'));for(const job of pendingMap.values())if(job.target===result.target&&job.item.source===result.source)settle(job,{error:info.message,...info});await broadcastDelete(result);return {ok:true,...result};});
+  if(message.type==='CACHE_ENTRY_DELETE')return locked(async()=>{const result=await editor.remove({id:message.id,source:message.source,target:message.target,expectedUpdatedAt:message.expectedUpdatedAt,expectedText:message.expectedText});const info=failure(appError('CANCELLED'));for(const job of pendingMap.values())if(relatedJob(job,result))settle(job,{error:info.message,...info});await broadcastDelete(result);return {ok:true,...result};});
   if(message.type==='EXPORT_START')return {ok:true,...await transfers.exportStart()};
   if(message.type==='EXPORT_PAGE')return {ok:true,...await transfers.exportNext({token:message.token,cursor:message.cursor})};
   if(message.type==='EXPORT_END')return {ok:true,...await transfers.exportEnd(message.token)};
@@ -165,7 +197,7 @@ async function handle(message,sender){await accessReady;if(!message||typeof mess
   if(message.type==='DELETE_OLDEST'){const count=message.count??message.amount;if(!Number.isSafeInteger(count)||count<1)throw appError('BAD_REQUEST','삭제 개수는 1 이상의 안전한 정수여야 합니다.');return locked(async()=>{const result=await cache.deleteOldest(count);await storageCleaned();return {ok:true,...result};});}
   if(message.type==='EXPORT_CACHE')return locked(async()=>({ok:true,...await cache.export()}));
   if(message.type==='IMPORT_CACHE')return locked(async()=>{const result=await cache.import(message.data,message.mode||'merge',{conflictPolicy:message.conflictPolicy});await invalidate();await storageCleaned();await broadcast(await currentConfig(await settings()));return {ok:true,...result};});
-  if(message.type==='CLEAR_CACHE')return locked(async()=>{await cache.clear();await invalidate();await storageCleaned();await broadcast(await currentConfig(await settings()));return {ok:true};});
+  if(message.type==='CLEAR_CACHE')return locked(async()=>{if(message.confirmed!==true)throw appError('BAD_REQUEST','캐시 전체 초기화에는 명시적인 확인이 필요합니다.');const result=await cache.clear();await invalidate();await storageCleaned();await broadcast(await currentConfig(await settings()));return {ok:true,...result};});
   if(message.type==='RESET_USAGE')return locked(async()=>{await chrome.storage.local.set({usage:{date:today(),chars:0,requests:0}});return {ok:true};});
   throw Error('알 수 없는 요청입니다.');
 }

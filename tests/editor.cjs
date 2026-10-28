@@ -5,7 +5,8 @@ const root=process.env.CRAVE_AI_ROOT||path.resolve(__dirname,'..');
 const data=source=>'data:text/javascript;base64,'+Buffer.from(source).toString('base64');
 const core=data(fs.readFileSync(path.join(root,'core.mjs'),'utf8'));
 const reliability=data(fs.readFileSync(path.join(root,'reliability.mjs'),'utf8'));
-const cacheUrl=data(fs.readFileSync(path.join(root,'cache.mjs'),'utf8').replace("from './core.mjs'",`from '${core}'`).replace("from './reliability.mjs'",`from '${reliability}'`));
+const dialogueUrl=data(fs.readFileSync(path.join(root,'dialogue-text.js'),'utf8'));
+const cacheUrl=data(fs.readFileSync(path.join(root,'cache.mjs'),'utf8').replace("from './core.mjs'",`from '${core}'`).replace("from './reliability.mjs'",`from '${reliability}'`).replace("import './dialogue-text.js'",`import '${dialogueUrl}'`));
 const C=await import(cacheUrl);
 const E=await import(data(fs.readFileSync(path.join(root,'cache-editor.mjs'),'utf8').replace("from './cache.mjs'",`from '${cacheUrl}'`)));
 const S=await import(data(fs.readFileSync(path.join(root,'cache-store.mjs'),'utf8').replace("from './cache.mjs'",`from '${cacheUrl}'`).replace("from './core.mjs'",`from '${core}'`).replace("from './reliability.mjs'",`from '${reliability}'`)));
@@ -13,7 +14,7 @@ const cmp=(a,b)=>JSON.stringify(a)===JSON.stringify(b)?0:Array.isArray(a)&&Array
 global.IDBKeyRange={bound:(lower,upper,lowerOpen=false,upperOpen=false)=>({lower,upper,lowerOpen,upperOpen}),lowerBound:(lower,lowerOpen=false)=>({lower,lowerOpen})};
 const inRange=(key,r)=>!r||((r.lower===undefined||cmp(key,r.lower)>(r.lowerOpen?0:-1))&&(r.upper===undefined||cmp(key,r.upper)<(r.upperOpen?0:1)));
 function mockDatabase(initial=[]){
-  const maps={translations:new Map(initial.map(e=>[e.id,structuredClone(e)])),'cache-metadata':new Map([['translation-count',{id:'translation-count',count:initial.length}],['source-identity-v3-recent-v1',{id:'source-identity-v3-recent-v1',done:true}]])};
+  const maps={translations:new Map(initial.map(e=>[e.id,structuredClone(e)])),'cache-metadata':new Map([['translation-count',{id:'translation-count',count:initial.length}],['source-identity-v3-dialogue-v1',{id:'source-identity-v3-dialogue-v1',done:true}]])};
   const stats={getAll:[],count:0,reads:0};let beforeWrite=null;
   const db={maps,stats,close(){},setBeforeWrite(fn){beforeWrite=fn;},transaction(names,mode){
     if(mode==='readwrite'&&beforeWrite){const fn=beforeWrite;beforeWrite=null;fn();}
@@ -54,6 +55,12 @@ await test('number/tag/variable/newline rejection is safe and atomic',async()=>{
   const db=mockDatabase([entry]),editor=E.createCacheEditor(cacheFor(db));
   for(const text of [entry.text.replace('10','20'),entry.text.replace('<b>',''),entry.text.replace('{value}',''),entry.text.replace('\n',' ')])await assert.rejects(()=>editor.save({id:entry.id,source:entry.source,target,text,expectedUpdatedAt:20,expectedText:entry.text}),e=>e.code==='INVALID'&&!e.message.includes(text));
   assert.equal(db.maps.translations.get(entry.id).text,entry.text);assert.equal(db.maps['cache-metadata'].get('translation-count').count,1);
+});
+await test('manual editor allows USER movement but rejects count changes and reordered ordinary spans',async()=>{
+  const named=await C.makeCacheEntry({source:'{USER}の攻撃10%\n{value}',target,text:'{USER}의 공격10%\n{value}',createdAt:10,updatedAt:20}),db=mockDatabase([named]),editor=E.createCacheEditor(cacheFor(db));
+  for(const text of ['공격10%\n{value}','{USER}공격10%\n{value}{USER}','공격\n10%{value}{USER}'])await assert.rejects(()=>editor.save({id:named.id,source:named.source,target,text,expectedUpdatedAt:20,expectedText:named.text}),{code:'INVALID'});
+  const text='공격10%\n{value}{USER}',saved=await editor.save({id:named.id,source:named.source,target,text,expectedUpdatedAt:20,expectedText:named.text});
+  assert.equal(saved.entry.text,text);assert.equal(saved.entry.manual,true);assert.equal(saved.cacheCount,1);
 });
 await test('explicit create pins unchanged JP; automatic put and warm preserve manual',async()=>{
   const db=mockDatabase(),store=S.createCacheStore(fakeIDB(db),{databaseName:'editor-unit'}),editor=E.createCacheEditor(store),source='アーサー',id=await C.cacheId(target,source);

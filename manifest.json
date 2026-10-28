@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "크레이브사가 번역기",
-  "version": "0.3.5",
+  "version": "0.3.10",
   "description": "AI 게임 번역과 캐시 On/Off 리모콘, 현재 화면 번역 즉시 수정을 지원합니다.",
   "minimum_chrome_version": "116",
   "permissions": [
@@ -38,6 +38,9 @@
         "https://gg-client-r.crave-saga.net/client/*/index_dmm.html"
       ],
       "js": [
+        "dialogue-text.js",
+        "name-policy.js",
+        "story-policy.js",
         "main.js"
       ],
       "all_frames": true,
@@ -50,6 +53,7 @@
       ],
       "js": [
         "retry-policy.js",
+        "auto-advance.js",
         "distribution-client.js",
         "game-remote.js",
         "content.js"
@@ -57,6 +61,12 @@
       "all_frames": true,
       "world": "ISOLATED",
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["dialogue-text.js"],
+      "matches": ["https://gg-client-r.crave-saga.net/*"]
     }
   ],
   "content_security_policy": {

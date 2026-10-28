@@ -7,7 +7,7 @@
 - **별도 helper 저장소**: https://github.com/longtail7989/cravesage-translator-gpt-helper
 - helper 다운로드: https://github.com/longtail7989/cravesage-translator-gpt-helper/releases/latest
 
-이 문서의 파일명 예시는 **v0.3.5** 기준입니다. 최신 릴리스의 실제 버전·설명·파일명을 우선 확인하세요. 설치 설명을 게시하는 작업이 사용자 PC의 설치·로그인·게임 새로고침을 자동 실행하지는 않습니다.
+확장 파일명 예시는 **v0.3.10**, 별도 helper 파일명 예시는 **v0.3.5** 기준입니다. 각각의 최신 릴리스에 있는 실제 버전·설명·파일명을 우선 확인하세요. 확장 업데이트가 helper의 버전 변경을 요구하지는 않습니다. 설치 설명을 게시하는 작업이 사용자 PC의 설치·로그인·게임 새로고침을 자동 실행하지는 않습니다.
 
 ## 목차
 
@@ -63,7 +63,7 @@ ChatGPT 웹 구독과 OpenAI API 결제는 같은 것이 아닙니다. 구독이
 
 [번역기 Releases](https://github.com/longtail7989/cravesaga-translator/releases/latest)에서 다음 파일을 받습니다.
 
-- `crave-ai-translator-0.3.5-extension.zip`
+- `crave-ai-translator-0.3.10-extension.zip`
 - 같은 릴리스의 `SHA256SUMS`
 
 일반 설치에는 자동 생성된 **Source code (zip)**가 아니라 이름 끝이 **`-extension.zip`인 배포 파일**을 사용하세요.
@@ -71,7 +71,7 @@ ChatGPT 웹 구독과 OpenAI API 결제는 같은 것이 아닙니다. 구독이
 다운로드가 손상되지 않았는지 PowerShell에서 확인할 수 있습니다. 실제 다운로드 파일명에 맞게 바꾸세요.
 
 ```powershell
-$ExtensionZip = Join-Path $env:USERPROFILE 'Downloads\crave-ai-translator-0.3.5-extension.zip'
+$ExtensionZip = Join-Path $env:USERPROFILE 'Downloads\crave-ai-translator-0.3.10-extension.zip'
 Get-FileHash -LiteralPath $ExtensionZip -Algorithm SHA256
 Get-Content -LiteralPath (Join-Path $env:USERPROFILE 'Downloads\SHA256SUMS')
 ```
@@ -329,7 +329,14 @@ reg.exe query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.crave_ai_tra
 
 게임 리모콘의 **배포 Start / Finish**는 개인 캐시와 별도의 기록을 수집해 선택한 NDJSON 파일로 저장하는 기능입니다. 시작할 때 파일 위치를 선택하고, 종료·저장 완료 안내까지 확인하세요. 수집 자체가 별도 AI 번역 요청을 추가하는 것은 아니지만 게임의 일반 번역 요청은 계속 발생할 수 있습니다.
 
+게임을 새로고침하면 진행 중인 배포 기록을 자동으로 마감·저장하고 **배포 Start** 대기로 돌아갑니다. 이미 허용된 파일 권한으로 저장할 수 있으면 Finish를 따로 누르지 않습니다. 권한 재확인·파일 오류가 있으면 저장 창을 유지하므로 안내를 확인하세요. 이전 수집을 자동 재개하거나 새 수집을 자동 시작하지 않습니다.
+
 파일에 게임 원문·번역·사용자 이름이 포함될 수 있으니 공유 전에 확인하세요. 계정 토큰·helper 상태 폴더를 번역 배포 파일에 섞지 않습니다.
+
+### 대사 자동진행 · 선택
+
+v0.3.10의 리모콘에서 **대사 자동진행 Off**를 눌러 켭니다. 기본 Off이고 배포 Start와 독립적입니다. 캐시 대사도 한국어를 게임의 진행률에 맞춰 서서히 표시하며, 원래 게임과 한국어 표시·번역·진행 중인 배포 수집 저장이 모두 끝나야 캔버스 중앙을 한 번 클릭합니다. 선택지·백로그·메뉴에서는 기다리고 수정창에서는 일시정지합니다. 배포 기록 오류·Finish·설정 변경·탭 숨김·페이지 이동 시 꺼집니다. 실제 게임 화면 구조를 확인할 수 없거나 번역이 없으면 건너뛰지 않습니다.
+
 
 ## 7. 업데이트
 
@@ -344,6 +351,8 @@ reg.exe query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.crave_ai_tra
 7. 게임 진행 상황을 확인한 뒤 직접 게임을 새로고침합니다.
 
 확장을 갱신하면 실행 중 게임의 이전 연결이 끊길 수 있습니다. 그 자체가 캐시 삭제를 뜻하지는 않습니다. 문제 해결 목적으로 확장 제거·전체 데이터 삭제부터 하지 마세요.
+
+v0.3.10은 팝업과 백그라운드의 버전·기능이 다르면 작업을 잠그고 **확장 다시 로드**를 안내합니다. 배포 기록도 복구 API 버전을 확인하므로 이전 워커가 남으면 **확장 업데이트 필요**를 표시합니다. 같은 폴더의 파일을 바꾸기만 해서는 실행 중인 워커가 교체되지 않을 수 있습니다. 다시 로드 후 팝업을 다시 열어 **0.3.10**을 확인하고 게임도 새로고침하세요. 이 동작은 저장된 캐시·설정을 초기화하지 않습니다. 이 업데이트를 이유로 helper를 재설치하거나 확장 ID 허용 정책을 바꾸지 않습니다.
 
 ### 7-2. helper 업데이트
 

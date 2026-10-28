@@ -1,7 +1,6 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id);
-  try { const label = $('popupVersion'); if (label) label.textContent = chrome.runtime.getManifest().version; } catch (_) {}
   const tabs = [...document.querySelectorAll('[role="tab"]')];
   const content = $('popupContent');
   const gameStatus = $('gameStatus');
@@ -139,12 +138,14 @@
     $('editorNotice').textContent = text;
     $('editorNotice').dataset.tone = error ? 'error' : 'info';
   }
+  const runtimeLocked = () => $('settingsForm').getAttribute?.('aria-busy') === 'true';
   function controls() {
-    $('editorSearch').disabled = pending || closed;
-    $('editorCancel').disabled = !pending || closed;
-    $('editorNext').disabled = pending || done || !cursor || closed;
-    $('editorSave').disabled = !selected || saving || closed;
-    $('editorDelete').disabled = !selected || saving || closed;
+    const locked = runtimeLocked();
+    $('editorSearch').disabled = pending || closed || locked;
+    $('editorCancel').disabled = !pending || closed || locked;
+    $('editorNext').disabled = pending || done || !cursor || closed || locked;
+    $('editorSave').disabled = !selected || saving || closed || locked;
+    $('editorDelete').disabled = !selected || saving || closed || locked;
   }
   function reset() {
     generation++;
@@ -171,7 +172,7 @@
     li.append(button); $('editorResults').append(li);
   }
   async function search(next = false) {
-    if (pending || closed) return;
+    if (pending || closed || runtimeLocked()) return;
     const query = $('editorQuery').value, target = $('editorTarget').value.trim(), mode = $('editorMode').value;
     const max = mode === 'exact' ? 8192 : 256;
     if (query.length > max || !target || target.length > 64) {
@@ -281,6 +282,13 @@
   $('editorDelete').addEventListener('click', removeEntry);
   $('editorReload').addEventListener('click', () => { if (selected) return select(selected.id,true); });
   for (const event of ['settingsloaded','settingssaved']) document.addEventListener(event, () => { $('editorTarget').value = $('target').value || '한국어'; reset(); });
+  document.addEventListener('settingsbusy', controls);
+  document.addEventListener('cachecleared', () => {
+    selecting++; selected = null; version = null; dirty = false;
+    $('editorSource').value = ''; $('editorEntryTarget').value = ''; $('editorText').value = ''; $('editorMeta').textContent = '';
+    $('editorDetail').hidden = true; $('editorReload').hidden = true; reset();
+    notice('캐시 전체 초기화로 검색 결과와 번역 초안을 비웠습니다.');
+  });
   const close = () => { closed = true; generation++; selecting++; };
   window.addEventListener('beforeunload',close,{once:true});
   window.addEventListener('pagehide',close,{once:true});

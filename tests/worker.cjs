@@ -1,6 +1,6 @@
 // Service worker integration tests with in-memory Chrome/IDB and fake HTTP only.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
-(async()=>{const root=process.env.CRAVE_AI_ROOT||path.resolve(__dirname,'..'),memory={},cache=new Map(),listeners=[],installed=[];const sentMessages=[];let uiPagesOpened=0,activeTab=null,frameMock=null;let httpCalls=0,seenOptions,responseMode='normal';let beforeRead=null,releaseFetch=null,translationReads=0;
+(async()=>{const root=process.env.CRAVE_AI_ROOT||path.resolve(__dirname,'..'),memory={},cache=new Map(),listeners=[],installed=[];const sentMessages=[];let uiPagesOpened=0,activeTab=null,frameMock=null;let httpCalls=0,seenOptions,responseMode='normal',transformProviderText=null;let beforeRead=null,releaseFetch=null,translationReads=0;
 // Deliberately bounded IDB model for worker routing regressions, not a native IDB authority.
 // Real browser tests cover locking, lifetime, durability and engine-specific event ordering.
 const databases=new Map(),MAX_ROWS=100000,MAX_REQUESTS=500000;
@@ -35,7 +35,7 @@ const idb={open(name,version=1){const r={};setTimeout(()=>{try{let state=databas
 // Trusted raw fixtures bypass CacheStore, so keep its maintained counter consistent.
 function rawCacheSet(id,value){cache.set(id,copy(value));databases.get('crave-ai-cache').stores.get('cache-metadata').rows.set('translation-count',{id:'translation-count',count:cache.size});}
 const chrome={storage:{local:{setAccessLevel:async()=>{},get:async key=>typeof key==='string'?{[key]:memory[key]}:{...memory},set:async value=>Object.assign(memory,value)}},permissions:{contains:async()=>true},tabs:{query:async()=>activeTab==null?[]:[{id:activeTab}],sendMessage:async(_id,m)=>{sentMessages.push({tabId:_id,message:copy(m)});if(m.type==='PUBLIC_CONFIG_CHANGED')return;if(!frameMock)throw Error('No receiver');return frameMock;}}, runtime:{id:'test',getURL:p=>'chrome-extension://test/'+p,openOptionsPage:async()=>{uiPagesOpened++;},onMessage:{addListener:l=>listeners.push(l)},onInstalled:{addListener:l=>installed.push(l)}}};
-const fakeFetch=async(url,options)=>{httpCalls++;seenOptions=options;if(responseMode==='deferred')await new Promise(resolve=>{releaseFetch=resolve;});if(responseMode==='large')return new Response('x'.repeat(2000001),{status:200});const body=JSON.parse(options.body),user=JSON.parse(body.messages[1].content);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({translations:user.items.map(x=>({id:x.id,text:x.text.replace('攻撃力が','공격력이 ').replace('上昇する。',' 상승합니다.')}))})}}]}),{status:200,headers:{'Content-Type':'application/json'}});};
+const fakeFetch=async(url,options)=>{httpCalls++;seenOptions=options;if(responseMode==='deferred')await new Promise(resolve=>{releaseFetch=resolve;});if(responseMode==='large')return new Response('x'.repeat(2000001),{status:200});const body=JSON.parse(options.body),user=JSON.parse(body.messages[1].content);return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify({translations:user.items.map(x=>({id:x.id,text:transformProviderText?transformProviderText(x):x.text.replace('攻撃力が','공격력이 ').replace('上昇する。',' 상승합니다.')}))})}}]}),{status:200,headers:{'Content-Type':'application/json'}});};
 const context=vm.createContext({chrome,indexedDB:idb,IDBKeyRange,crypto:require('node:crypto').webcrypto,URL,TextEncoder,TextDecoder,Uint8Array,AbortController,setTimeout,clearTimeout,Response,fetch:fakeFetch,console});
 const core=new vm.SourceTextModule(fs.readFileSync(path.join(root,'core.mjs'),'utf8'),{context});await core.link(()=>{});await core.evaluate();const modules=new Map([['./core.mjs',core]]);function loadModule(spec){if(modules.has(spec))return modules.get(spec);if(spec==='./network-client.mjs'){const mock=new vm.SyntheticModule(['createNetworkClient'],function(){this.setExport('createNetworkClient',()=>({cancelAll:async()=>{},jsonFetch:async(url,options={})=>{const r=await fakeFetch(url,{...options,credentials:'omit',redirect:'error'});const raw=await r.text();if(raw.length>2000000)throw Object.assign(Error('large'),{code:'RESPONSE_TOO_LARGE',retryable:false});return JSON.parse(raw);}}));},{context});modules.set(spec,mock);return mock;}const mod=new vm.SourceTextModule(fs.readFileSync(path.join(root,spec),'utf8'),{context});modules.set(spec,mod);return mod;}const bg=loadModule('./background.mjs');await bg.link(loadModule);await bg.evaluate();
 const admin={id:'test',url:'chrome-extension://test/popup.html'},game={id:'test',url:'https://gg-client-r.crave-saga.net/client/1.1.122/index_dmm.html',tab:{id:1},frameId:8,documentId:'mock'};
@@ -61,9 +61,9 @@ const legacyId=await core.namespace.hashKey(core.namespace.legacyCacheIdentity(m
 httpBefore=httpCalls;r=await send({type:'CACHE_WARM'},game);check('warm cache supplies only translation records without settings',()=>{assert(r.entries.length>=2);assert(!JSON.stringify(r).includes('FAKE_ONLY_TEST'));assert(!Object.hasOwn(r,'settings'));assert.equal(httpCalls,httpBefore);});
 const exported=await send({type:'EXPORT_CACHE'});check('export contains original text and stable IDs but no credentials',()=>{assert.equal(exported.ok,true);assert.equal(exported.exported,2);assert.equal(exported.data.version,3);assert(exported.data.entries.every(x=>typeof x.context==='string'));assert(exported.data.entries.some(x=>x.context==='Skill'));assert(exported.data.entries.some(x=>x.context==='Menu'));assert(exported.data.entries.every(x=>x.source&&x.id.startsWith('v3:')));assert(!JSON.stringify(exported).includes('FAKE_ONLY_TEST'));});
 r=await send({type:'EXPORT_CACHE'},game);check('game cannot export or import full private cache',()=>assert.equal(r.ok,false));
-await send({type:'CLEAR_CACHE'});r=await send({type:'IMPORT_CACHE',data:exported.data,mode:'replace'});check('file round trip restores all entries after clear',()=>{assert.equal(r.ok,true);assert.equal(r.imported,2);assert.equal(r.cacheCount,2);});
+await send({type:'CLEAR_CACHE',confirmed:true});r=await send({type:'IMPORT_CACHE',data:exported.data,mode:'replace'});check('file round trip restores all entries after clear',()=>{assert.equal(r.ok,true);assert.equal(r.imported,2);assert.equal(r.cacheCount,2);});
 const changed=structuredClone(exported.data);changed.entries=changed.entries.filter(x=>x.context==='Skill');changed.entries[0].text='공격력이 10% 증가합니다.';r=await send({type:'IMPORT_CACHE',data:changed,mode:'merge'});check('merge preserves existing translation and reports skipped conflict',()=>{assert.equal(r.ok,true);assert.equal(r.imported,0);assert.equal(r.skipped,1);});
-const bad=structuredClone(changed);bad.entries[0].text='공격력이 99% 증가합니다.';r=await send({type:'IMPORT_CACHE',data:bad,mode:'replace'});check('invalid replacement is rejected before clearing cache',()=>{assert.equal(r.ok,false);assert.equal(cache.size,2);});
+const bad=structuredClone(changed);bad.entries[0].text='공격력이 99% 증가합니다.';r=await send({type:'IMPORT_CACHE',data:bad,mode:'replace'});check('translation content differences import unchanged with warnings',()=>{assert.equal(r.ok,true);assert.equal(r.imported,1);assert.equal(r.validationWarnings,1);assert.equal(cache.get(bad.entries[0].id).text,bad.entries[0].text);});
 r=await send({type:'IMPORT_CACHE',data:changed,mode:'replace'});check('explicit replace atomically installs selected file only',()=>{assert.equal(r.ok,true);assert.equal(r.cacheCount,1);});
 const restartHttpBefore=httpCalls;const bgRestart=new vm.SourceTextModule(fs.readFileSync(path.join(root,'background.mjs'),'utf8'),{context});await bgRestart.link(loadModule);await bgRestart.evaluate();r=await new Promise(resolve=>listeners[1]({type:'CACHE_LOOKUP',items:[{id:'restart',source:'攻撃力が10%上昇する。',context:'Skill'}]},game,resolve));check('new service worker reuses persistent imported cache without AI',()=>{assert.equal(r.results[0].text,'공격력이 10% 증가합니다.');assert.equal(httpCalls,restartHttpBefore);});
 const cm=modules.get('./cache.mjs').namespace;const newest=await cm.makeCacheEntry({source:'再検査',context:'Menu',target:'한국어',text:'재검사 (최신)'});const raceLegacy=await core.namespace.hashKey(core.namespace.legacyCacheIdentity(memory.settings,'再検査','Menu'));rawCacheSet(raceLegacy,{id:raceLegacy,text:'재검사 (이전)',time:Date.now()-1000});beforeRead=id=>{if(id===raceLegacy){rawCacheSet(newest.id,newest);beforeRead=null;}};httpBefore=httpCalls;r=await send({type:'CACHE_LOOKUP',items:[{id:'race',source:'再検査',context:'Menu'}]},game);check('legacy promotion cannot overwrite a newer canonical cache entry',()=>{assert.equal(r.results[0].text,'재검사 (최신)');assert.equal(cache.get(newest.id).text,'재검사 (최신)');assert(!cache.has(raceLegacy));});
@@ -136,7 +136,7 @@ for(const [contextName,time,text]of [['Skill',11,'오래된 번역'],['Story',12
 await new Promise((resolve,reject)=>{const tx=migrationState.db.transaction('translations','readwrite');tx.oncomplete=resolve;tx.onerror=tx.onabort=reject;for(const row of migrationRows)tx.objectStore('translations').put(row);});
 const migratedStore=modules.get('./cache-store.mjs').namespace.createCacheStore(idb,{databaseName:migrationName});
 const migratedCount=await migratedStore.count(),migrationLookup=await migratedStore.lookup({source:'重複原文',context:'Other'},memory.settings);
-check('real schema-v4 migration checkpoints beyond 64 rows and deduplicates legacy context identities',()=>{assert.equal(migratedCount,67);assert.equal(migrationLookup.text,'최신 번역');assert.equal(migrationState.db.version,4);assert([...migrationState.stores.get('translations').rows.keys()].every(x=>x.startsWith('v3:')));assert.equal(migrationState.stores.get('cache-metadata').rows.get('source-identity-v3-recent-v1').done,true);assert.equal(migrationState.stores.get('cache-metadata').rows.get('translation-count').count,67);});
+check('bounded migration preserves count and deduplicates legacy context identities',()=>{assert.equal(migratedCount,67);assert.equal(migrationLookup.text,'최신 번역');assert([...migrationState.stores.get('translations').rows.keys()].every(x=>x.startsWith('v3:')));assert.equal(migrationState.stores.get('cache-metadata').rows.get('translation-count').count,67);});
 await migratedStore.destroy();
 check('test IDB database deletion is scoped and leaves worker cache intact',()=>{assert(!databases.has(migrationName));assert.equal(cache.size,2);});
 
@@ -292,5 +292,103 @@ tests+=await policySuite.exports({send,cm,cache,rawCacheSet,databases,memory,htt
 const offSuite={exports:{}};
 new Function('module','exports','require',fs.readFileSync(path.join(root,'tests/cache-off.cjs'),'utf8'))(offSuite,offSuite.exports,require);
 tests+=await offSuite.exports({send,cm,cache,rawCacheSet,databases,memory,httpCount:()=>httpCalls,assert,game,admin,setResponseMode:mode=>{responseMode=mode;if(mode==='deferred')releaseFetch=null;},waitDeferred:async()=>{for(let i=0;i<200&&!releaseFetch;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(typeof releaseFetch,'function');},releaseDeferred:()=>releaseFetch(),readCount:()=>translationReads});
+await send({type:'SAVE_SETTINGS',settings:{provider:'custom',endpoint:'http://127.0.0.1:1234/v1',model:'mock',enabled:true,consent:true,playerName:'',displayName:'표시 이름',requestTimeoutSeconds:180}});
+const nicknameGame={...game,documentId:'nickname-backport'},canonicalName='{USER}攻撃力が61%上昇する。';
+httpBefore=httpCalls;
+r=await send({type:'TRANSLATE',items:[{id:'name-a',source:'レオン攻撃力が61%上昇する。',templates:[canonicalName]},{id:'name-b',source:'アキラ攻撃力が61%上昇する。',templates:[canonicalName]}]},nicknameGame);
+check('one AI request stores a shared nickname template for two current names',()=>{assert.equal(r.results.length,2);assert(r.results.every(row=>row.text==='{USER}공격력이 61% 상승합니다.'&&row.cacheSource===canonicalName));assert.equal(httpCalls,httpBefore+1);assert.equal([...cache.values()].filter(row=>row.source===canonicalName).length,1);assert(![...cache.values()].some(row=>row.source==='レオン攻撃力が61%上昇する。'));});
+const sentNameItem=JSON.parse(JSON.parse(seenOptions.body).messages[1].content).items[0];
+check('provider input contains only protected name placeholders, not the original nickname',()=>{assert(!JSON.stringify(sentNameItem).includes('レオン'));assert(!JSON.stringify(sentNameItem).includes('アキラ'));});
+httpBefore=httpCalls;
+r=await send({type:'CACHE_LOOKUP',items:[{id:'name-c',source:'タロウ攻撃力が61%上昇する。',templates:[canonicalName]}]},nicknameGame);
+check('a different player reuses the stored shared template without AI',()=>{assert.equal(r.results[0].text,'{USER}공격력이 61% 상승합니다.');assert.equal(r.results[0].cacheSource,canonicalName);assert.equal(httpCalls,httpBefore);});
+const literalName=await cm.makeCacheEntry({source:'アキラ攻撃力が61%上昇する。',target:'한국어',text:'아키라 전용 61% 번역',manual:true});rawCacheSet(literalName.id,literalName);
+r=await send({type:'TRANSLATE',items:[{id:'name-exact',source:literalName.source,templates:[canonicalName]}]},nicknameGame);
+check('an exact literal cache still wins over a shared name template',()=>{assert.equal(r.results[0].text,literalName.text);assert.equal(r.results[0].cacheSource,literalName.source);assert.equal(httpCalls,httpBefore);});
+const awaitNameId=await cm.cacheId('한국어',canonicalName);
+await send({type:'SET_CACHE_ENABLED',cacheEnabled:false});httpBefore=httpCalls;
+r=await send({type:'TRANSLATE',items:[{id:'name-off',source:literalName.source,templates:[canonicalName]}]},nicknameGame);
+check('cache Off replaces the old literal override with the new canonical AI result',()=>{assert.equal(httpCalls,httpBefore+1);assert.equal(r.results[0].text,'{USER}공격력이 61% 상승합니다.');assert(!cache.has(literalName.id));assert.equal(cache.get(awaitNameId).manual,undefined);});
+await send({type:'SET_CACHE_ENABLED',cacheEnabled:true});httpBefore=httpCalls;
+r=await send({type:'CACHE_LOOKUP',items:[{id:'name-on-again',source:literalName.source,templates:[canonicalName]}]},nicknameGame);
+check('returning to cache On uses the newly generated shared result, not the removed override',()=>{assert.equal(r.results[0].cacheSource,canonicalName);assert.equal(r.results[0].text,'{USER}공격력이 61% 상승합니다.');assert.equal(httpCalls,httpBefore);});
+const identityId=await cm.cacheId('한국어','{USER}'),identityUsage=JSON.stringify(memory.usage);
+assert(!cache.has(identityId));
+const identityLimits={requests:memory.settings.dailyRequestLimit,chars:memory.settings.dailyCharLimit};
+memory.settings.dailyRequestLimit=1;memory.settings.dailyCharLimit=1;
+r=await send({type:'TRANSLATE',items:[{id:'name-alone',source:'한글이름',templates:['{USER}']}]},nicknameGame);
+check('absent standalone USER is durable before settling even with exhausted provider quota',()=>{assert.equal(r.results[0].text,'{USER}');assert.equal(r.results[0].cacheSource,'{USER}');assert.equal(r.results[0].cacheSaved,true);assert.equal(r.cacheSaved,true);assert.equal(cache.get(identityId).text,'{USER}');assert.equal(httpCalls,httpBefore);assert.equal(JSON.stringify(memory.usage),identityUsage);});
+memory.settings.dailyRequestLimit=identityLimits.requests;memory.settings.dailyCharLimit=identityLimits.chars;
+const recordingStore=modules.get('./distribution-store.mjs').namespace.createDistributionStore();
+const identityOwner={tabId:game.tab.id,frameId:game.frameId};
+const identitySession=await recordingStore.start({owner:identityOwner,target:'한국어',fileName:'synthetic-identity.ndjson'});
+const identityCapture=await send({type:'DISTRIBUTION_CAPTURE',id:identitySession.id,items:[{source:r.results[0].cacheSource,text:r.results[0].text,target:'한국어'}]},nicknameGame);
+check('real recorder broker accepts newly generated USER against durable canonical cache',()=>{assert.equal(identityCapture.ok,true);assert.equal(identityCapture.accepted,1);assert.equal(identityCapture.skipped,0);assert.equal(identityCapture.session.count,1);assert(!identityCapture.session.errorCode);assert.equal(httpCalls,httpBefore);assert.equal(JSON.stringify(memory.usage),identityUsage);});
+await recordingStore.finish(identityOwner,identitySession.id);
+const identityRecording=await recordingStore.exportPage({id:identitySession.id});
+check('recorded USER exports the validated canonical identity rather than the literal player name',()=>{assert.equal(identityRecording.entries.length,1);assert.equal(identityRecording.entries[0].source,'{USER}');assert.equal(identityRecording.entries[0].text,'{USER}');assert.equal(identityRecording.entries[0].id,identityId);});
+await recordingStore.discard(identityOwner,identitySession.id);
+const identityLiteral=await cm.makeCacheEntry({source:'한글이름',target:'한국어',text:'개인 이름',manual:true});rawCacheSet(identityLiteral.id,identityLiteral);
+r=await send({type:'TRANSLATE',items:[{id:'identity-literal',source:'한글이름',templates:['{USER}']}]},nicknameGame);
+check('standalone name still prefers its exact manual literal in cache On',()=>{assert.equal(r.results[0].text,identityLiteral.text);assert.equal(r.results[0].cacheSource,identityLiteral.source);});
+await send({type:'SET_CACHE_ENABLED',cacheEnabled:false});
+r=await send({type:'TRANSLATE',items:[{id:'identity-off',source:'한글이름',templates:['{USER}']}]},nicknameGame);
+check('cache Off durably replaces standalone literal with canonical identity without charging usage',()=>{assert.equal(r.results[0].text,'{USER}');assert.equal(r.results[0].cacheSaved,true);assert(!cache.has(identityLiteral.id));assert.equal(cache.get(identityId).text,'{USER}');assert.equal(httpCalls,httpBefore);assert.equal(JSON.stringify(memory.usage),identityUsage);});
+await send({type:'SET_CACHE_ENABLED',cacheEnabled:true});
+const identityRestart=await new Promise(resolve=>listeners[1]({type:'TRANSLATE',items:[{id:'identity-restart',source:'한글이름',templates:['{USER}']}]},{...nicknameGame,documentId:'identity-restart'},resolve));
+check('returning On and another worker reuse the durable canonical identity',()=>{assert.equal(identityRestart.results[0].cached,true);assert.equal(identityRestart.results[0].cacheSource,'{USER}');assert.equal(identityRestart.results[0].text,'{USER}');assert.equal(httpCalls,httpBefore);assert.equal(JSON.stringify(memory.usage),identityUsage);});
+await send({type:'SET_CACHE_ENABLED',cacheEnabled:false});
+const validationGame={...game,documentId:'recorder-portable-validation'};
+for(const [name,source,invalidOutput] of [
+  ['added line ending','攻撃力が71%上昇する。',text=>text+'\n'],
+  ['changed numeric sign','攻撃力が72%上昇する。',text=>text.replace('공격력이 ','공격력이 -')],
+  ['merged protected numbers','攻撃力が73と74上昇する。',text=>text.replace('と','')]
+]){
+  const previous=await cm.makeCacheEntry({source,target:'한국어',text:source.replace('攻撃力が','공격력이 ').replace('上昇する。',' 이전 상승합니다.'),manual:true});
+  rawCacheSet(previous.id,previous);const snapshot=JSON.stringify(cache.get(previous.id));
+  transformProviderText=item=>invalidOutput(item.text.replace('攻撃力が','공격력이 ').replace('上昇する。',' 상승합니다.'));
+  try{r=await send({type:'TRANSLATE',items:[{id:'invalid-portable',source}]},validationGame);}finally{transformProviderText=null;}
+  check('Off rejects '+name+' before display or durable replacement',()=>{assert.equal(r.ok,true);assert.equal(r.results[0].code,'VALIDATION');assert.equal(r.results[0].retryable,true);assert.equal(r.results[0].text,undefined);assert.equal(JSON.stringify(cache.get(previous.id)),snapshot);});
+  r=await send({type:'TRANSLATE',items:[{id:'valid-portable',source}]},validationGame);
+  const generated=r.results[0],session=await recordingStore.start({owner:identityOwner,target:'한국어',fileName:'synthetic-protected.ndjson'});
+  const capture=await send({type:'DISTRIBUTION_CAPTURE',id:session.id,items:[{source:generated.cacheSource,text:generated.text,target:'한국어'}]},validationGame);
+  check('valid retry after '+name+' is durable and accepted by strict recorder',()=>{assert.equal(generated.cacheSaved,true);assert.equal(cache.get(previous.id).text,generated.text);assert.equal(capture.ok,true);assert.equal(capture.accepted,1);assert.equal(capture.skipped,0);assert.equal(capture.session.errorCode,undefined);});
+  await recordingStore.discard(identityOwner,session.id);
+}
+const changingGame={...game,documentId:'recorder-changing-output'},changingSource='{USER}<b>攻撃力が75%</b>\n上昇する。';
+const changingRequest=(id,name)=>({type:'TRANSLATE',items:[{id,source:changingSource.replace('{USER}',name),templates:[changingSource],context:'AdvText'}]});
+let wording=' 상승합니다.';
+transformProviderText=item=>item.text.replace('攻撃力が','공격력이 ').replace('上昇する。',wording);
+responseMode='deferred';releaseFetch=null;httpBefore=httpCalls;
+const changingOwner=send(changingRequest('changing-owner','レオン'),changingGame);
+for(let i=0;i<200&&!releaseFetch;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(typeof releaseFetch,'function');
+const changingJoin=send(changingRequest('changing-join','アキラ'),changingGame);
+await new Promise(resolve=>setTimeout(resolve,50));responseMode='normal';releaseFetch();
+const changingFirst=await changingOwner,changingJoined=await changingJoin,firstTranslation=changingFirst.results[0];
+check('overlapping Off literal labels share one durable protected canonical result',()=>{assert.equal(httpCalls,httpBefore+1);assert.equal(changingJoined.results[0].shared,true);assert.equal(changingJoined.results[0].text,firstTranslation.text);assert.equal(firstTranslation.cacheSource,changingSource);assert.equal(firstTranslation.cacheSaved,true);});
+const changingSession=await recordingStore.start({owner:identityOwner,target:'한국어',fileName:'synthetic-changing.ndjson'});
+const changingCapture=value=>send({type:'DISTRIBUTION_CAPTURE',id:changingSession.id,items:[{source:value.cacheSource,text:value.text,target:'한국어'}]},changingGame);
+const firstCapture=await changingCapture(firstTranslation);
+wording=' 증가합니다.';
+let changingSecond;
+try{changingSecond=await send(changingRequest('changing-repeat','タロウ'),changingGame);}finally{transformProviderText=null;}
+const secondTranslation=changingSecond.results[0],secondCapture=await changingCapture(secondTranslation);
+check('repeated Off canonical source accepts varying valid AI and records its newly durable text',()=>{assert.equal(httpCalls,httpBefore+2);assert.notEqual(secondTranslation.text,firstTranslation.text);assert.equal(secondTranslation.cacheSaved,true);assert.equal(firstCapture.accepted,1);assert.equal(secondCapture.accepted,1);assert.equal(secondCapture.skipped,0);assert.equal(secondCapture.session.count,1);assert.equal(secondCapture.session.errorCode,undefined);});
+const staleCapture=await changingCapture(firstTranslation);
+check('late old display cannot silently replace a newer durable canonical translation',()=>{assert.equal(staleCapture.accepted,0);assert.equal(staleCapture.skipped,1);assert.equal(staleCapture.skipReasons.TEXT_CHANGED,1);assert.equal(staleCapture.session.errorCode,'TEXT_CHANGED');assert.equal(staleCapture.session.warning,'PARTIAL_RECORDING');});
+await recordingStore.finish(identityOwner,changingSession.id);
+const changingExport=await recordingStore.exportPage({id:changingSession.id});
+check('a rejected late capture preserves the most recently recorded protected wording',()=>{assert.equal(changingExport.entries.length,1);assert.equal(changingExport.entries[0].text,secondTranslation.text);});
+await recordingStore.discard(identityOwner,changingSession.id);
+const beforeResetSettings=JSON.stringify(memory.settings),beforeResetSize=cache.size;
+for(const confirmed of [undefined,false,'true']){r=await send({type:'CLEAR_CACHE',...(confirmed===undefined?{}:{confirmed})});assert.equal(r.ok,false);}
+r=await send({type:'CLEAR_CACHE',confirmed:true},nicknameGame);
+check('reset requires explicit trusted confirmation and leaves data untouched otherwise',()=>{assert.equal(r.ok,false);assert.equal(cache.size,beforeResetSize);assert.equal(JSON.stringify(memory.settings),beforeResetSettings);});
+responseMode='deferred';releaseFetch=null;
+const beforeResetPending=send({type:'TRANSLATE',items:[{id:'name-before-reset',source:'攻撃力が62%上昇する。'},{id:'identity-before-reset',source:'새이름',templates:['{USER}']}]},nicknameGame);
+for(let i=0;i<200&&!releaseFetch;i++)await new Promise(resolve=>setTimeout(resolve,5));assert.equal(typeof releaseFetch,'function');
+const usageAtReset=JSON.stringify(memory.usage);
+r=await send({type:'CLEAR_CACHE',confirmed:true});responseMode='normal';releaseFetch();const afterResetPending=await beforeResetPending;
+check('reset preserves settings and usage while stale AI and identity cannot refill the cleared cache',()=>{assert.equal(r.ok,true);assert.equal(r.cacheCount,0);assert.equal(cache.size,0);assert.equal(JSON.stringify(memory.settings),beforeResetSettings);assert.equal(JSON.stringify(memory.usage),usageAtReset);assert(afterResetPending.results.every(row=>row.code==='CANCELLED'));});
 console.log(`\n${tests} worker integration tests passed with fake HTTP only.`);
 })().catch(e=>{console.error(e);process.exitCode=1;});

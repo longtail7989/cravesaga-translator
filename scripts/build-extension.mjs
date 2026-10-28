@@ -18,7 +18,7 @@ const files = [
  'cache-transfer.mjs', 'cache-editor.mjs', 'chatgpt-client.mjs', 'content.js',
  'distribution-broker.mjs', 'distribution-client.js', 'distribution-files.mjs',
  'distribution-store.mjs', 'distribution-ui.mjs', 'distribution.css', 'distribution.html',
- 'game-remote.js', 'main.js', 'network-client.mjs', 'network-worker.js', 'offscreen.html',
+ 'game-remote.js', 'name-policy.js', 'dialogue-text.js', 'story-policy.js', 'auto-advance.js', 'main.js', 'network-client.mjs', 'network-worker.js', 'offscreen.html',
  'offscreen.js', 'options.js', 'popup.css', 'popup.html', 'popup.js', 'reliability.mjs',
  'retry-policy.js', 'icons/icon16.png', 'icons/icon32.png', 'icons/icon48.png', 'icons/icon128.png'
 ].sort();

@@ -1,7 +1,8 @@
-import {cacheId,makeCacheEntry,isModernEntry,portableEntry,buildExport,validateImport,validatePortableEntries,preferredEntry,validateTextPair,checkPortableShape,indexedCacheEntry,byteSize,CACHE_MAX_FILE_BYTES} from './cache.mjs';
+import {cacheId,makeCacheEntry,isModernEntry,portableEntry,buildExport,validateImport,validatePortableEntries,preferredEntry,validateTextShape,hasTextPairWarning,checkPortableShape,indexedCacheEntry,byteSize,CACHE_MAX_FILE_BYTES} from './cache.mjs';
 import {hashKey,legacyCacheIdentity} from './core.mjs';
 import {unchangedJapanese} from './reliability.mjs';
-const META='cache-metadata',COUNTER='translation-count',DELETED='deleted-source:',MIGRATION='source-identity-v3-recent-v1',BATCH=64;
+const dialogue=globalThis[Symbol.for('crave-ai-dialogue-text.v1')];
+const META='cache-metadata',COUNTER='translation-count',GENERATION='cache-generation',DELETED='deleted-source:',MIGRATION='source-identity-v3-dialogue-v1',BATCH=64;
 // Every translations writer must include META in its transaction and update this row.
 function adjustCount(tx,delta,{reset=false,onValue=()=>{}}={}){
   const meta=tx.objectStore(META);
@@ -11,7 +12,7 @@ function adjustCount(tx,delta,{reset=false,onValue=()=>{}}={}){
 }
 export function validateConflictPolicy(policy){if(policy!==undefined&&policy!=='keep-local'&&policy!=='use-incoming')throw Error('지원하지 않는 캐시 충돌 처리 방식입니다.');return policy;}
 const range=()=>globalThis.IDBKeyRange;
-const useful=e=>{try{return isModernEntry(e)&&validateTextPair(e.source,e.text)&&(e.manual===true||!unchangedJapanese(e.source,e.text,e.target));}catch{return false;}};
+const useful=e=>{try{return isModernEntry(e)&&validateTextShape(e.source,e.text)&&(e.manual===true||!unchangedJapanese(e.source,e.text,e.target));}catch{return false;}};
 function transaction(db,names,mode,fn){return new Promise((resolve,reject)=>{
   const tx=db.transaction(names,mode);let result,error;
   tx.oncomplete=()=>resolve(typeof result==='function'?result():result);
@@ -24,12 +25,13 @@ export function createCacheStore(idb=globalThis.indexedDB,{databaseName='crave-a
   if(typeof databaseName!=='string'||!databaseName)throw Error('캐시 데이터베이스 이름이 필요합니다.');
   let closed=false;
   const opened=new Promise((resolve,reject)=>{
-    const r=idb.open(databaseName,4);
+    const r=idb.open(databaseName,5);
     r.onupgradeneeded=()=>{
       const db=r.result,s=db.objectStoreNames.contains('translations')?r.transaction.objectStore('translations'):db.createObjectStore('translations',{keyPath:'id'});
       if(!s.indexNames.contains('time'))s.createIndex('time','time');
       if(!s.indexNames.contains('targetTime'))s.createIndex('targetTime',['target','time']);
       if(!s.indexNames.contains('targetRecent'))s.createIndex('targetRecent',['target','reverseTime','id']);
+      if(!s.indexNames.contains('dialogue'))s.createIndex('dialogue',['target','dialogueKey','manualRank','reverseTime','id']);
       if(!db.objectStoreNames.contains(META))db.createObjectStore(META,{keyPath:'id'});
       const imports=db.objectStoreNames.contains('imports')?r.transaction.objectStore('imports'):db.createObjectStore('imports',{keyPath:['token','id']});
       if(!imports.indexNames.contains('token'))imports.createIndex('token','token');
@@ -54,7 +56,7 @@ export function createCacheStore(idb=globalThis.indexedDB,{databaseName='crave-a
       const converted=[];
       for(const raw of batch.rows){
         if(!isModernEntry(raw))continue;
-        try{const entries=await validatePortableEntries([portableEntry(raw)]);converted.push({entry:entries[0],oldId:raw.id});}catch{/* Preserve unverifiable rows. */}
+        try{const entries=await validatePortableEntries([portableEntry(raw)],{allowTextWarnings:true});converted.push({entry:entries[0],oldId:raw.id});}catch{/* Preserve unverifiable rows. */}
       }
       await transaction(db,['translations',META],'readwrite',(tx)=>{
         const store=tx.objectStore('translations');
@@ -74,21 +76,34 @@ export function createCacheStore(idb=globalThis.indexedDB,{databaseName='crave-a
   }
   const ready=opened.then(async db=>{const migrated=await migrate(db);await ensureCount(db,migrated);return db;});
   const database=async()=>{if(closed)throw Error('캐시 연결이 닫혔습니다.');return ready;};
-  async function apply(entries,{clear=false,keepExisting=false,conflictPolicy,replaceExisting=false}={}){
+  async function generation(){const db=await database();return transaction(db,META,'readonly',(tx,set)=>{const r=tx.objectStore(META).get(GENERATION);r.onsuccess=()=>set(r.result?.value??0);});}
+  async function apply(entries,{clear=false,keepExisting=false,conflictPolicy,replaceExisting=false,expectedGeneration,removeIds=[]}={}){
     const db=await database();
-    return transaction(db,['translations',META],'readwrite',(tx,set)=>{
-      const store=tx.objectStore('translations');let imported=0,skipped=0,added=0,cacheCount=0;
-      if(clear)store.clear();
-      let i=0;const next=()=>{if(i>=entries.length){adjustCount(tx,added,{reset:clear,onValue:n=>{cacheCount=n;}});return;}const entry=entries[i++],r=store.get(entry.id);
+    return transaction(db,['translations',META],'readwrite',(tx,set,fail)=>{
+      const store=tx.objectStore('translations');let imported=0,skipped=0,added=0,cacheCount=0,validationWarnings=0;
+      const written=new Set(entries.map(e=>e.id));let aliasIndex=0;
+      const removeAliases=()=>{
+        if(!replaceExisting||aliasIndex>=entries.length){adjustCount(tx,added,{reset:clear,onValue:n=>{cacheCount=n;}});return;}
+        const entry=entries[aliasIndex++];if(entry.dialogueKey===undefined||!dialogue.isStory(entry.context)){removeAliases();return;}
+        const bounds=range().bound([entry.target,entry.dialogueKey,0,0,''],[entry.target,entry.dialogueKey,1,Number.MAX_SAFE_INTEGER,'\uffff']),r=store.index('dialogue').openCursor(bounds);
+        r.onsuccess=()=>{const c=r.result;if(!c){removeAliases();return;}if(!written.has(c.primaryKey)){store.delete(c.primaryKey);added--;}c.continue();};
+      };
+      let removing=0;const finish=()=>{if(removing>=removeIds.length){removeAliases();return;}const id=removeIds[removing++],r=store.get(id);r.onsuccess=()=>{if(!r.result){finish();return;}const d=store.delete(id);d.onsuccess=()=>{added--;finish();};};};
+      let i=0;const next=()=>{if(i>=entries.length){finish();return;}const entry=entries[i++],r=store.get(entry.id);
         r.onsuccess=()=>{const old=r.result;
           const explicit=keepExisting&&conflictPolicy!==undefined;
           if(explicit&&conflictPolicy==='keep-local'&&useful(old)&&old.source===entry.source&&old.target===entry.target){skipped++;next();return;}
           if(!explicit&&keepExisting&&useful(old)&&!(entry.manual===true&&old.manual!==true&&useful(entry))){skipped++;next();return;}
           // Explicit file choice replaces the entire validated row, without inheriting a local pin.
           const chosen=explicit||replaceExisting?entry:preferredEntry(old,entry);if(chosen===old){skipped++;next();return;}
-          const w=store.put(indexedCacheEntry(chosen));w.onsuccess=()=>{imported++;if(!old)added++;next();};
+          const w=store.put(indexedCacheEntry(chosen));w.onsuccess=()=>{imported++;if(hasTextPairWarning(chosen.source,chosen.text))validationWarnings++;if(!old)added++;next();};
         };
-      };next();set(()=>({imported,skipped,cacheCount}));
+      };
+      const r=tx.objectStore(META).get(GENERATION);r.onsuccess=()=>{
+        if(expectedGeneration!==undefined&&(r.result?.value??0)!==expectedGeneration){fail(Error('캐시가 초기화되어 불러오기 작업이 중단되었습니다. 다시 시작하세요.'));return;}
+        if(clear)store.clear();next();
+      };
+      set(()=>({imported,skipped,cacheCount,validationWarnings}));
     });
   }
   async function count(){const db=await database();return transaction(db,META,'readonly',(tx,set,fail)=>{const r=tx.objectStore(META).get(COUNTER);r.onsuccess=()=>{if(!Number.isSafeInteger(r.result?.count)||r.result.count<0){fail(Error('캐시 개수 메타데이터가 올바르지 않습니다.'));return;}set(r.result.count);};});}
@@ -115,6 +130,15 @@ export function createCacheStore(idb=globalThis.indexedDB,{databaseName='crave-a
       return useful(record)&&record.source===item.source&&record.target===settings.target?record:null;
     }catch{return null;}
   }
+  async function lookupDialogue(item,settings){
+    if(!dialogue.isStory(item.context))return null;
+    const db=await database(),key=dialogue.key(item.source);
+    return transaction(db,'translations','readonly',(tx,set)=>{
+      const bounds=range().bound([settings.target,key,0,0,''],[settings.target,key,1,Number.MAX_SAFE_INTEGER,'\uffff']);
+      const r=tx.objectStore('translations').index('dialogue').getAll(bounds,16);
+      r.onsuccess=()=>set(r.result.find(e=>useful(e)&&dialogue.equivalent(item.source,e.source)&&!hasTextPairWarning(e.source,e.text))||null);
+    });
+  }
   async function exportPage({cursor=null,limit=250,maxBytes=1048576}={}){
     if(cursor!==null&&(typeof cursor!=='string'||!/^v3:[a-f0-9]{64}$/.test(cursor)))throw Error('캐시 내보내기 커서가 올바르지 않습니다.');
     if(!Number.isSafeInteger(limit)||limit<1||limit>10000||!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>32*1024*1024)throw Error('내보내기 페이지 크기가 올바르지 않습니다.');
@@ -131,26 +155,39 @@ export function createCacheStore(idb=globalThis.indexedDB,{databaseName='crave-a
     });
   }
   return {
-    lookup,count,exportPage,
+    lookup,lookupDialogue,count,exportPage,
     // Trusted extension backend only; never forward this handle to message clients.
     _database:database,
-    async put(items,settings,{replaceExisting=false}={}){for(let i=0;i<items.length;i+=32){const entries=await Promise.all(items.slice(i,i+32).map(x=>makeCacheEntry({source:x.source,context:x.context||'',target:settings.target,text:x.text})));await apply(entries,{replaceExisting:replaceExisting===true});}},
-    async clear(){const db=await database();return transaction(db,['translations',META],'readwrite',tx=>{tx.objectStore('translations').clear();adjustCount(tx,0,{reset:true});});},
+    _generation:generation,
+    async put(items,settings,{replaceExisting=false}={}){const expectedGeneration=await generation();for(let i=0;i<items.length;i+=32){const batch=items.slice(i,i+32),entries=await Promise.all(batch.map(x=>makeCacheEntry({source:x.source,context:x.context||'',target:settings.target,text:x.text}))),written=new Set(entries.map(x=>x.id)),removeIds=[];if(replaceExisting)for(const item of batch)for(const source of item.replaceSources||[]){const id=await cacheId(settings.target,source);if(!written.has(id)&&!removeIds.includes(id))removeIds.push(id);}await apply(entries,{replaceExisting:replaceExisting===true,expectedGeneration,removeIds});}},
+    async clear(){
+      const db=await database();return transaction(db,['translations','imports',META],'readwrite',(tx,set,fail)=>{
+        tx.objectStore('translations').clear();tx.objectStore('imports').clear();
+        const meta=tx.objectStore(META),r=meta.get(GENERATION);r.onsuccess=()=>{
+          const value=(r.result?.value??0)+1;if(!Number.isSafeInteger(value)){fail(Error('캐시 초기화 세대가 올바르지 않습니다.'));return;}
+          meta.put({id:GENERATION,value});
+        };
+        const markers=meta.openCursor();markers.onsuccess=()=>{const c=markers.result;if(!c)return;const id=c.primaryKey;if(typeof id==='string'&&(id.startsWith(DELETED)||id.startsWith('transfer:')))meta.delete(id);c.continue();};
+        adjustCount(tx,0,{reset:true});set({cacheCount:0});
+      });
+    },
     async export(){
-      const entries=[];let cursor=null,bytes=512;
+      const expectedGeneration=await generation(),entries=[];let cursor=null,bytes=512;
       do{const p=await exportPage({cursor});for(const e of p.entries){bytes+=byteSize(e)+1;if(bytes>CACHE_MAX_FILE_BYTES)throw Error('32MiB를 초과하는 캐시는 exportPage() 페이지 내보내기를 사용하세요.');entries.push(e);}cursor=p.cursor;if(p.done)break;}while(cursor);
-      const result=buildExport(entries);result.legacySkipped=Math.max(0,(await count())-entries.length);return result;
+      const result=buildExport(entries);result.legacySkipped=Math.max(0,(await count())-entries.length);if(await generation()!==expectedGeneration)throw Error('캐시가 초기화되어 내보내기 작업이 중단되었습니다. 다시 시작하세요.');return result;
     },
     async importBatch(entries,{keepExisting=true,conflictPolicy}={}){
       validateConflictPolicy(conflictPolicy);
       if(!Array.isArray(entries)||entries.length>1000)throw Error('한 번에 최대 1,000개씩 importBatch()를 호출하세요.');
+      const expectedGeneration=await generation();
       let bytes=0;for(const e of entries){checkPortableShape(e);bytes+=byteSize(e)+1;if(bytes>8*1024*1024)throw Error('불러오기 배치는 8MiB 이하여야 합니다.');}
-      const valid=await validatePortableEntries(entries);const result=await apply(valid,{keepExisting,conflictPolicy});return {...result,skipped:result.skipped+entries.length-valid.length};
+      const valid=await validatePortableEntries(entries,{allowTextWarnings:true});const result=await apply(valid,{keepExisting,conflictPolicy,expectedGeneration});return {...result,skipped:result.skipped+entries.length-valid.length};
     },
     async import(data,mode='merge',{conflictPolicy}={}){
       validateConflictPolicy(conflictPolicy);
       if(!['merge','replace'].includes(mode))throw Error('지원하지 않는 캐시 불러오기 방식입니다.');
-      const entries=await validateImport(data);const result=await apply(entries,{clear:mode==='replace',keepExisting:mode==='merge',conflictPolicy});
+      const expectedGeneration=await generation();
+      const entries=await validateImport(data);const result=await apply(entries,{clear:mode==='replace',keepExisting:mode==='merge',conflictPolicy,expectedGeneration});
       return {...result,skipped:result.skipped+data.entries.length-entries.length,cacheCount:result.cacheCount};
     },
     async warm(target){

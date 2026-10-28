@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run 22 offline extension CJS suites (20 standalone and 2 embedded)
+      - name: Run 26 offline extension CJS suites (24 standalone and 2 embedded)
         run: node scripts/test.mjs
       - name: Build allowlisted extension ZIP and verify reproducibility
         shell: pwsh

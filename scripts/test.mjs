@@ -7,10 +7,11 @@ import path from 'node:path';
 import os from 'node:os';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const suites = [
+ 'auto-advance.cjs', 'backlog.cjs', 'story-policy.cjs',
  'cache.cjs', 'chatgpt-ui.cjs', 'chatgpt-worker.cjs', 'cli-removal.cjs',
  'distribution-broker.cjs', 'distribution-client.cjs', 'distribution-store.cjs',
  'distribution-ui.cjs', 'editor-ui.cjs', 'editor.cjs', 'latency.cjs',
- 'network.cjs', 'popup-transfer.cjs', 'popup.cjs', 'relay-off.cjs',
+ 'names.cjs', 'network.cjs', 'popup-transfer.cjs', 'popup.cjs', 'relay-off.cjs',
  'remote-ui.cjs', 'retry.cjs', 'run.cjs', 'subscription-ui.cjs', 'worker.cjs'
 ];
 // These exported fixture suites execute inside worker.cjs with its mock worker.
@@ -43,5 +44,5 @@ try {
   if (result.error || result.status !== 0) { failed++; console.error('FAILED ' + file, result.error?.message || result.signal || result.status); }
  }
 } finally { rmSync(scratch,{recursive:true,force:true}); }
-console.log('\n' + (failed ? 'FAILED: ' + failed + ' entrypoint(s)' : 'PASS: 22 offline extension CJS suites (20 entrypoints + 2 embedded worker suites).'));
+console.log('\n' + (failed ? 'FAILED: ' + failed + ' entrypoint(s)' : 'PASS: ' + expected.length + ' offline extension CJS suites (' + suites.length + ' entrypoints + ' + embedded.length + ' embedded worker suites).'));
 if (failed) process.exitCode = 1;
